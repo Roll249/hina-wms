@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 
 @Injectable()
@@ -8,11 +8,18 @@ export class StockService {
   /**
    * Tra cứu tồn kho tổng quan (kèm reserved qty).
    * Lấy trực tiếp từ Inventory model của hina-e-comm.
+   *
+   * Filter mới:
+   * - isClassified=true  → chỉ sản phẩm đã phân loại (tab "Đã phân loại")
+   * - isClassified=false → chỉ sản phẩm chưa phân loại (tab "Chưa phân loại")
+   * - categoryId         → lọc theo category cụ thể
    */
   async listStock(params: {
     search?: string;
     warehouseId?: string;
     lowStockOnly?: boolean;
+    isClassified?: boolean;     // NEW
+    categoryId?: string;        // NEW
     page?: number;
     pageSize?: number;
     sortBy?: 'quantity' | 'name' | 'updatedAt';
@@ -21,6 +28,8 @@ export class StockService {
     const {
       search,
       lowStockOnly,
+      isClassified,
+      categoryId,
       page = 1,
       pageSize = 50,
       sortBy = 'updatedAt',
@@ -28,16 +37,20 @@ export class StockService {
     } = params;
     const skip = (page - 1) * pageSize;
 
-    // Tìm theo productCode hoặc product name
+    // Base where: chỉ lấy product chưa xóa
     const where: any = { product: { deletedAt: null } };
-    if (lowStockOnly) {
-      where.OR = [
-        { quantity: { lte: 0 } },
-        { quantity: { lte: { } } }, // sẽ filter sau
-      ];
+
+    // Filter theo trạng thái phân loại (cho 2 tab)
+    if (isClassified !== undefined) {
+      where.product.isClassified = isClassified;
     }
 
-    // Build từ product filter
+    // Filter theo category cụ thể
+    if (categoryId) {
+      where.product.categoryId = categoryId;
+    }
+
+    // Search theo productCode / name / sku
     if (search) {
       where.product = {
         ...where.product,
@@ -54,7 +67,7 @@ export class StockService {
       };
     }
 
-    // Order by: nếu sort theo 'name' thì cần order theo product.name
+    // Order by
     let orderBy: any;
     if (sortBy === 'name') {
       orderBy = { product: { name: sortDir } };
@@ -74,6 +87,9 @@ export class StockService {
             select: {
               id: true, sku: true, productCode: true, name: true,
               basePrice: true,
+              isClassified: true,
+              categoryId: true,
+              category: { select: { id: true, name: true, slug: true } },
               images: { take: 1, orderBy: { sortOrder: 'asc' } },
             },
           },
@@ -90,7 +106,7 @@ export class StockService {
       this.prisma.inventory.count({ where }),
     ]);
 
-    // Lọc low stock sau khi fetch (vì cần so sánh quantity với lowStockThreshold)
+    // Lọc low stock sau khi fetch
     let filteredItems = items;
     if (lowStockOnly) {
       filteredItems = items.filter(
@@ -114,12 +130,284 @@ export class StockService {
         available: it.quantity - it.reservedQty,
         lowStockThreshold: it.lowStockThreshold,
         isLowStock: it.quantity <= it.lowStockThreshold,
+        isClassified: it.product?.isClassified ?? false,
+        categoryId: it.product?.categoryId,
+        categoryName: it.product?.category?.name,
+        categorySlug: it.product?.category?.slug,
       })),
       total,
       page,
       pageSize,
       hasMore: skip + items.length < total,
     };
+  }
+
+  /**
+   * Lấy danh sách categories để filter trên UI.
+   * Kèm count sản phẩm đã phân loại vào mỗi category.
+   */
+  async listCategories() {
+    const categories = await this.prisma.category.findMany({
+      where: { deletedAt: null },
+      select: {
+        id: true, name: true, slug: true,
+        _count: {
+          select: { products: { where: { deletedAt: null, isClassified: true } } },
+        },
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    return categories.map((c) => ({
+      id: c.id,
+      name: c.name,
+      slug: c.slug,
+      productCount: c._count.products,
+    }));
+  }
+
+  /**
+   * Lấy counts cho 2 tab "Chưa phân loại" / "Đã phân loại".
+   */
+  async getClassificationCounts() {
+    const [unclassified, classified] = await Promise.all([
+      this.prisma.product.count({
+        where: { deletedAt: null, isClassified: false },
+      }),
+      this.prisma.product.count({
+        where: { deletedAt: null, isClassified: true },
+      }),
+    ]);
+    return { unclassified, classified, total: unclassified + classified };
+  }
+
+  /**
+   * Phân loại sản phẩm (gán vào category mới + flag isClassified).
+   * Dùng để admin kéo sản phẩm từ "Chưa phân loại" sang category cụ thể.
+   *
+   * Nếu gán vào đúng category mặc định (Import Lotussouvenir) thì coi như
+   * reset về chưa phân loại.
+   */
+  async classifyProduct(params: {
+    productId: string;
+    categoryId: string;
+    actorUserId: string;
+    actorEmail: string;
+    actorRole: string;
+    ipAddress?: string;
+  }) {
+    const { productId, categoryId, actorUserId, actorEmail, actorRole, ipAddress } = params;
+
+    const product = await this.prisma.product.findUnique({ where: { id: productId } });
+    if (!product) throw new NotFoundException('Sản phẩm không tồn tại');
+
+    const newCategory = await this.prisma.category.findUnique({ where: { id: categoryId } });
+    if (!newCategory) throw new NotFoundException('Category không tồn tại');
+
+    // Nếu gán vào category mặc định "Import Lotussouvenir" → set isClassified=false
+    const isDefaultCategory = newCategory.name.toLowerCase().includes('import');
+
+    const oldCategoryId = product.categoryId;
+    const oldIsClassified = product.isClassified;
+
+    const updated = await this.prisma.product.update({
+      where: { id: productId },
+      data: {
+        categoryId,
+        isClassified: !isDefaultCategory,
+      },
+    });
+
+    // Ghi AuditLog
+    await this.prisma.auditLog.create({
+      data: {
+        entityType: 'Product',
+        entityId: productId,
+        action: 'UPDATE',
+        changes: {
+          categoryId: [oldCategoryId, categoryId],
+          isClassified: [oldIsClassified, !isDefaultCategory],
+          note: isDefaultCategory
+            ? 'Reset về chưa phân loại (category mặc định)'
+            : 'Phân loại sản phẩm vào kho',
+        },
+        userId: actorUserId,
+        userEmail: actorEmail,
+        userRole: actorRole,
+        ipAddress,
+      },
+    });
+
+    return {
+      productId: updated.id,
+      categoryId: updated.categoryId,
+      isClassified: updated.isClassified,
+      isDefaultCategory,
+    };
+  }
+
+  /**
+   * Sửa thông tin sản phẩm (tên, mô tả, attributes, giá, weight, dimensions, taxRate, supplierCode, ...).
+   * KHÔNG cho sửa: id, productCode, sku (vì ảnh hưởng đến đơn hàng đang xử lý).
+   * (Tuy nhiên theo yêu cầu user, cho phép sửa cả productCode/sku - có confirm ở frontend)
+   *
+   * Ghi AuditLog với changes JSON (oldValue → newValue cho mỗi field thay đổi).
+   */
+  async editProduct(params: {
+    productId: string;
+    patch: {
+      name?: string;
+      productCode?: string;
+      sku?: string;
+      description?: string;
+      shortDesc?: string;
+      basePrice?: number;
+      weight?: number;
+      dimensions?: Record<string, number>;
+      attributes?: Record<string, any>;
+      taxRate?: number;
+      supplierCode?: string;
+      metaTitle?: string;
+      metaDesc?: string;
+      showPriceToGuest?: boolean;
+      showPriceToRetail?: boolean;
+      showPriceToWholesale?: boolean;
+    };
+    actorUserId: string;
+    actorEmail: string;
+    actorRole: string;
+    ipAddress?: string;
+  }) {
+    const { productId, patch, actorUserId, actorEmail, actorRole, ipAddress } = params;
+
+    // Lấy sản phẩm hiện tại
+    const product = await this.prisma.product.findUnique({
+      where: { id: productId },
+    });
+    if (!product) throw new NotFoundException(`Không tìm thấy sản phẩm ${productId}`);
+
+    // Kiểm tra quyền
+    const allowedRoles = ['MANAGE', 'ADMIN'];
+    if (!allowedRoles.includes(actorRole)) {
+      throw new ForbiddenException(
+        `Chỉ MANAGE/ADMIN được sửa sản phẩm. Role hiện tại: ${actorRole}`,
+      );
+    }
+
+    // Nếu sửa productCode → check unique
+    if (patch.productCode && patch.productCode !== product.productCode) {
+      const exists = await this.prisma.product.findFirst({
+        where: { productCode: patch.productCode, NOT: { id: productId } },
+      });
+      if (exists) {
+        throw new ForbiddenException(`Mã sản phẩm "${patch.productCode}" đã tồn tại`);
+      }
+    }
+
+    // Nếu sửa sku → check unique
+    if (patch.sku && patch.sku !== product.sku) {
+      const exists = await this.prisma.product.findFirst({
+        where: { sku: patch.sku, NOT: { id: productId } },
+      });
+      if (exists) {
+        throw new ForbiddenException(`SKU "${patch.sku}" đã tồn tại`);
+      }
+    }
+
+    // So sánh từng field, build changes
+    const changes: Record<string, [any, any]> = {};
+    const fieldsToCheck = [
+      'name', 'productCode', 'sku', 'description', 'shortDesc',
+      'basePrice', 'weight', 'dimensions', 'attributes',
+      'taxRate', 'supplierCode', 'metaTitle', 'metaDesc',
+      'showPriceToGuest', 'showPriceToRetail', 'showPriceToWholesale',
+    ] as const;
+
+    for (const field of fieldsToCheck) {
+      if (patch[field] === undefined) continue;
+      const oldVal = (product as any)[field];
+      const newVal = patch[field];
+
+      // So sánh JSON (dimensions, attributes) bằng stringify
+      const isJson = field === 'dimensions' || field === 'attributes';
+      const same = isJson
+        ? JSON.stringify(oldVal) === JSON.stringify(newVal)
+        : oldVal === newVal || (oldVal == null && newVal == null);
+
+      if (!same) {
+        changes[field] = [oldVal, newVal];
+      }
+    }
+
+    if (Object.keys(changes).length === 0) {
+      return { productId, changed: 0, changes: {} };
+    }
+
+    // Update
+    const updated = await this.prisma.product.update({
+      where: { id: productId },
+      data: patch,
+    });
+
+    // Ghi AuditLog
+    await this.prisma.auditLog.create({
+      data: {
+        entityType: 'Product',
+        entityId: productId,
+        action: 'UPDATE',
+        changes: changes as any,
+        userId: actorUserId,
+        userEmail: actorEmail,
+        userRole: actorRole,
+        ipAddress,
+      },
+    });
+
+    return {
+      productId: updated.id,
+      changed: Object.keys(changes).length,
+      changes,
+    };
+  }
+
+  /**
+   * Lấy lịch sử sửa sản phẩm (từ AuditLog).
+   */
+  async getProductHistory(productId: string, limit = 30) {
+    return this.prisma.auditLog.findMany({
+      where: {
+        entityType: 'Product',
+        entityId: productId,
+        action: 'UPDATE',
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      select: {
+        id: true,
+        action: true,
+        changes: true,
+        userEmail: true,
+        userRole: true,
+        ipAddress: true,
+        createdAt: true,
+      },
+    });
+  }
+
+  /**
+   * Chi tiết 1 sản phẩm (cho edit form prefill).
+   */
+  async getProductDetail(productId: string) {
+    const product = await this.prisma.product.findUnique({
+      where: { id: productId },
+      include: {
+        category: { select: { id: true, name: true, slug: true } },
+        inventory: true,
+        images: { take: 1, orderBy: { sortOrder: 'asc' } },
+      },
+    });
+    if (!product) throw new NotFoundException('Sản phẩm không tồn tại');
+    return product;
   }
 
   /**

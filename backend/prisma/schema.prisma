@@ -719,6 +719,11 @@ model Product {
   // Supplier's own product code / barcode
   supplierCode  String?
 
+  // WMS: đánh dấu sản phẩm đã được phân loại cho kho hay chưa.
+  // false = sản phẩm mới thêm lên web, chưa được admin gán vào category cụ thể của kho.
+  // true  = đã phân loại xong, hiển thị trong kho theo categoryId.
+  isClassified  Boolean           @default(false)
+
   @@index([categoryId])
   @@index([visibility])
   @@index([slug])
@@ -726,6 +731,7 @@ model Product {
   @@index([productCode])
   @@index([deletedAt])
   @@index([soldCount])
+  @@index([isClassified])
 }
 
 model ProductImage {
