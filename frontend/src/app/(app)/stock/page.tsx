@@ -32,17 +32,21 @@ export default function StockPage() {
     }
   });
 
-  const { data: counts } = useClassificationCounts();
-  const { data: categories = [] } = useCategories();
+  const { data: counts, error: countsError } = useClassificationCounts();
+  const { data: categories = [], error: categoriesError } = useCategories();
 
   const isClassified = tab === "classified";
-  const { data, isLoading } = useStock({
+  const { data, isLoading, error: stockError } = useStock({
     search: search || undefined,
     lowStockOnly: lowOnly,
     isClassified,
     categoryId: categoryFilter || undefined,
     pageSize: 100,
   });
+
+  // Hiển thị lỗi rõ ràng nếu API bị 403
+  const anyError = countsError || categoriesError || stockError;
+  const is403 = (anyError as any)?.response?.status === 403 || (anyError as any)?.status === 403;
 
   return (
     <div className="space-y-3 pb-24">
@@ -167,7 +171,24 @@ export default function StockPage() {
       </div>
 
       {/* List */}
-      {isLoading ? (
+      {is403 ? (
+        <Card padding="lg" className="text-center">
+          <p className="text-red-600 font-semibold mb-2">⚠️ 403 Forbidden</p>
+          <p className="text-sm text-gray-600 mb-3">
+            Token đăng nhập không hợp lệ hoặc role không đủ quyền.
+            Vui lòng đăng nhập lại.
+          </p>
+          <button
+            onClick={() => {
+              localStorage.removeItem("wms-auth-storage");
+              window.location.href = "/login";
+            }}
+            className="px-4 py-2 rounded-lg bg-primary-600 text-white text-sm font-medium hover:bg-primary-700"
+          >
+            Đăng nhập lại
+          </button>
+        </Card>
+      ) : isLoading ? (
         <p className="text-center text-gray-500 py-8">Đang tải...</p>
       ) : data?.items.length === 0 ? (
         <Card padding="lg" className="text-center text-gray-500">

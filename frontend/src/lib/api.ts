@@ -42,6 +42,21 @@ api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     const originalRequest = error.config as any;
+
+    // 403 Forbidden = role không đủ. Không thể refresh được → logout.
+    if (error.response?.status === 403) {
+      console.warn(
+        "[api] 403 Forbidden → token có thể hết hạn hoặc role không đủ. Logout.",
+        error.config?.url,
+      );
+      const { useAuthStore } = await import("@/stores/auth-store");
+      useAuthStore.getState().clearAuth();
+      if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
+        window.location.href = "/login?reason=forbidden";
+      }
+      return Promise.reject(error);
+    }
+
     if (error.response?.status === 401 && !originalRequest._retry) {
       if (isRefreshing) {
         return new Promise((resolve) => {
