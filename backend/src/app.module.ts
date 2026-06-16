@@ -6,6 +6,7 @@ import { AuthGuardModule } from './common/guards/auth-guard.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { WarehouseModule } from './modules/warehouse/warehouse.module';
 import { StockModule } from './modules/stock/stock.module';
+import { CategoryModule } from './modules/category/category.module';
 import { ReceiptsModule } from './modules/receipts/receipts.module';
 import { ShipmentsModule } from './modules/shipments/shipments.module';
 import { WebhookModule } from './modules/webhook/webhook.module';
@@ -21,6 +22,7 @@ import { HealthModule } from './modules/health/health.module';
     AuthModule,
     WarehouseModule,
     StockModule,
+    CategoryModule,
     ReceiptsModule,
     ShipmentsModule,
     WebhookModule,

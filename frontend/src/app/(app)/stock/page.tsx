@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Search, AlertTriangle, Edit3, FolderTree } from "lucide-react";
+import Link from "next/link";
+import { Search, AlertTriangle, Edit3, FolderTree, Plus, Settings2 } from "lucide-react";
 import {
   useStock,
   useClassificationCounts,
@@ -52,11 +53,21 @@ export default function StockPage() {
     <div className="space-y-3 pb-24">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Tồn kho</h1>
-        {data && (
-          <Badge variant="default">
-            {data.items.length} / {data.total}
-          </Badge>
-        )}
+        <div className="flex items-center gap-2">
+          <Link
+            href="/categories"
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-gray-300 text-xs font-medium text-gray-700 hover:bg-gray-50"
+            title="Quản lý categories (đồng bộ với web)"
+          >
+            <Settings2 className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Quản lý DM</span>
+          </Link>
+          {data && (
+            <Badge variant="default">
+              {data.items.length} / {data.total}
+            </Badge>
+          )}
+        </div>
       </div>
 
       {/* Tabs phân loại */}
@@ -166,6 +177,14 @@ export default function StockPage() {
                 {c.name} ({c.productCount})
               </button>
             ))}
+            <Link
+              href="/categories"
+              className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap bg-green-50 border border-green-300 text-green-700 hover:bg-green-100"
+              title="Tạo category mới (đồng bộ với web)"
+            >
+              <Plus className="w-3 h-3" />
+              Tạo mới
+            </Link>
           </div>
         )}
       </div>

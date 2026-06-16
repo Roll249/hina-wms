@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, PackageOpen, PackageMinus, BarChart3, History } from "lucide-react";
+import { Home, PackageOpen, PackageMinus, BarChart3, History, FolderTree } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -10,6 +10,7 @@ const navItems = [
   { href: "/receive",   label: "Nhập kho", icon: PackageOpen },
   { href: "/ship",      label: "Xuất kho", icon: PackageMinus },
   { href: "/stock",     label: "Tồn kho",  icon: BarChart3 },
+  { href: "/categories",label: "Danh mục", icon: FolderTree },
   { href: "/history",   label: "Lịch sử",  icon: History },
 ];
 
