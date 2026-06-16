@@ -1,8 +1,9 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
 import { Request } from 'express';
 import { StockService } from './stock.service';
 import { Roles } from '../../common/decorators/auth.decorators';
 import { Role } from '@prisma/client';
+import { GetPresignedUrlDto, AddProductImageDto, UpdateProductImageDto } from '../upload/dto/upload.dto';
 
 interface AuthedRequest extends Request {
   user: {
@@ -148,5 +149,58 @@ export class StockController {
   @Get('alerts/low-stock')
   lowStockAlerts(@Query('threshold') threshold?: string) {
     return this.stock.lowStockAlerts(threshold ? Number(threshold) : undefined);
+  }
+
+  // ============================================================
+  // PRODUCT IMAGE MANAGEMENT (MinIO presigned upload)
+  // ============================================================
+
+  /**
+   * Tạo presigned URL để FE upload ảnh trực tiếp lên MinIO.
+   */
+  @Post('product/:id/images/presigned')
+  presignedImageUpload(
+    @Param('id') productId: string,
+    @Body() dto: GetPresignedUrlDto,
+  ) {
+    return this.stock.generateProductImagePresignedUrl(productId, dto.contentType);
+  }
+
+  /**
+   * Lấy tất cả ảnh của sản phẩm (product + variants).
+   */
+  @Get('product/:id/images')
+  getProductImages(@Param('id') productId: string) {
+    return this.stock.getProductImages(productId);
+  }
+
+  /**
+   * Thêm 1 ảnh vào ProductImage (sau khi FE upload lên MinIO thành công).
+   */
+  @Post('product/:id/images')
+  addProductImage(
+    @Param('id') productId: string,
+    @Body() dto: AddProductImageDto,
+  ) {
+    return this.stock.addProductImage(productId, dto);
+  }
+
+  /**
+   * Cập nhật ảnh (altText / isPrimary / sortOrder).
+   */
+  @Patch('product/images/:imageId')
+  updateProductImage(
+    @Param('imageId') imageId: string,
+    @Body() dto: UpdateProductImageDto,
+  ) {
+    return this.stock.updateProductImage(imageId, dto);
+  }
+
+  /**
+   * Xóa ảnh (row DB + best-effort xóa file MinIO).
+   */
+  @Delete('product/images/:imageId')
+  deleteProductImage(@Param('imageId') imageId: string) {
+    return this.stock.deleteProductImage(imageId);
   }
 }

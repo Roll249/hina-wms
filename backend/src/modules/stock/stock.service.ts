@@ -1,9 +1,13 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { UploadService } from '../upload/upload.service';
 
 @Injectable()
 export class StockService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly upload: UploadService,
+  ) {}
 
   /**
    * Tra cứu tồn kho tổng quan (kèm reserved qty).
@@ -609,5 +613,169 @@ export class StockService {
         lowStockThreshold: it.lowStockThreshold,
       }))
       .sort((a, b) => a.available - b.available);
+  }
+
+  // ============================================================
+  // PRODUCT IMAGE MANAGEMENT
+  // ============================================================
+
+  /**
+   * Tạo presigned URL để frontend upload ảnh trực tiếp lên MinIO.
+   * Flow:
+   *  1) FE: POST /stock/product/:id/images/presigned {contentType}
+   *     → nhận { uploadUrl, publicUrl, key }
+   *  2) FE: PUT uploadUrl (với file binary) → upload lên MinIO
+   *  3) FE: POST /stock/product/:id/images { url: publicUrl, altText?, sortOrder?, isPrimary? }
+   *     → INSERT row ProductImage
+   */
+  async generateProductImagePresignedUrl(productId: string, contentType: string) {
+    const product = await this.prisma.product.findUnique({ where: { id: productId } });
+    if (!product) throw new NotFoundException('Sản phẩm không tồn tại');
+    return this.upload.generatePresignedUrlForProduct(productId, contentType);
+  }
+
+  /**
+   * Lấy tất cả ảnh của 1 sản phẩm (cả ảnh ở variant lẫn product).
+   * Trả về kèm flag `level: "product" | "variant"` để UI biết.
+   */
+  async getProductImages(productId: string) {
+    const product = await this.prisma.product.findUnique({
+      where: { id: productId },
+      select: {
+        id: true,
+        name: true,
+        images: {
+          orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }, { createdAt: 'asc' }],
+          select: {
+            id: true, url: true, altText: true, sortOrder: true, isPrimary: true,
+            variantId: true, createdAt: true,
+          },
+        },
+        variants: {
+          select: {
+            id: true, sku: true, name: true,
+            images: {
+              orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }, { createdAt: 'asc' }],
+              select: {
+                id: true, url: true, altText: true, sortOrder: true, isPrimary: true,
+                variantId: true, createdAt: true,
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!product) throw new NotFoundException('Sản phẩm không tồn tại');
+    return product;
+  }
+
+  /**
+   * Thêm 1 ProductImage row (sau khi FE đã upload file lên MinIO thành công).
+   * - Nếu isPrimary=true → unset primary của ảnh khác cùng product.
+   * - sortOrder: auto = max+1 nếu không truyền.
+   */
+  async addProductImage(
+    productId: string,
+    dto: { url: string; altText?: string; sortOrder?: number; isPrimary?: boolean },
+  ) {
+    const product = await this.prisma.product.findUnique({ where: { id: productId } });
+    if (!product) throw new NotFoundException('Sản phẩm không tồn tại');
+
+    // Auto sortOrder
+    let sortOrder = dto.sortOrder;
+    if (sortOrder === undefined) {
+      const last = await this.prisma.productImage.findFirst({
+        where: { productId, variantId: null },
+        orderBy: { sortOrder: 'desc' },
+        select: { sortOrder: true },
+      });
+      sortOrder = (last?.sortOrder ?? -1) + 1;
+    }
+
+    // Nếu set primary → unset các ảnh primary khác
+    if (dto.isPrimary) {
+      await this.prisma.productImage.updateMany({
+        where: { productId, variantId: null, isPrimary: true },
+        data: { isPrimary: false },
+      });
+    }
+
+    return this.prisma.productImage.create({
+      data: {
+        id: crypto.randomUUID(),
+        productId,
+        variantId: null,
+        url: dto.url,
+        altText: dto.altText ?? null,
+        sortOrder,
+        isPrimary: dto.isPrimary ?? false,
+      },
+    });
+  }
+
+  /**
+   * Cập nhật ảnh (altText, isPrimary, sortOrder).
+   * Nếu isPrimary=true → unset primary các ảnh khác cùng product.
+   */
+  async updateProductImage(
+    imageId: string,
+    dto: { altText?: string; sortOrder?: number; isPrimary?: boolean },
+  ) {
+    const img = await this.prisma.productImage.findUnique({ where: { id: imageId } });
+    if (!img) throw new NotFoundException('Ảnh không tồn tại');
+
+    if (dto.isPrimary) {
+      await this.prisma.productImage.updateMany({
+        where: {
+          productId: img.productId,
+          variantId: img.variantId,
+          isPrimary: true,
+          id: { not: imageId },
+        },
+        data: { isPrimary: false },
+      });
+    }
+
+    return this.prisma.productImage.update({
+      where: { id: imageId },
+      data: {
+        altText: dto.altText ?? undefined,
+        sortOrder: dto.sortOrder ?? undefined,
+        isPrimary: dto.isPrimary ?? undefined,
+      },
+    });
+  }
+
+  /**
+   * Xóa ảnh: DELETE row trong DB + xóa file trên MinIO (best effort).
+   * Nếu là primary → tự set ảnh khác làm primary (sortOrder nhỏ nhất).
+   */
+  async deleteProductImage(imageId: string) {
+    const img = await this.prisma.productImage.findUnique({ where: { id: imageId } });
+    if (!img) throw new NotFoundException('Ảnh không tồn tại');
+
+    // Xóa row trước
+    await this.prisma.productImage.delete({ where: { id: imageId } });
+
+    // Best-effort xóa file MinIO (không throw nếu fail)
+    if (img.url) {
+      this.upload.deleteFile(img.url).catch(() => undefined);
+    }
+
+    // Nếu vừa xóa ảnh primary → set ảnh khác làm primary
+    if (img.isPrimary) {
+      const next = await this.prisma.productImage.findFirst({
+        where: { productId: img.productId, variantId: img.variantId },
+        orderBy: { sortOrder: 'asc' },
+      });
+      if (next) {
+        await this.prisma.productImage.update({
+          where: { id: next.id },
+          data: { isPrimary: true },
+        });
+      }
+    }
+
+    return { ok: true, id: imageId };
   }
 }

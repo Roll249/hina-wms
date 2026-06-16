@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { Save, Loader2, History as HistoryIcon, X, Tag } from "lucide-react";
+import { Save, Loader2, History as HistoryIcon, X, Tag, Image as ImageIcon } from "lucide-react";
 import { Modal, ConfirmDialog } from "@/components/ui/modal";
 import {
   useProductDetail,
@@ -10,6 +10,7 @@ import {
   useCategories,
   useClassifyProduct,
 } from "@/hooks/use-stock";
+import { ProductImageGallery } from "./product-image-gallery";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -40,7 +41,7 @@ export function EditProductDrawer({ productId, open, onClose }: EditProductDrawe
   const editMutation = useEditProduct();
   const classifyMutation = useClassifyProduct();
 
-  const [tab, setTab] = useState<"edit" | "history" | "classify">("edit");
+  const [tab, setTab] = useState<"edit" | "history" | "classify" | "images">("edit");
   const [form, setForm] = useState<Record<string, any>>({});
   const [original, setOriginal] = useState<Record<string, any>>({});
   const [showConfirm, setShowConfirm] = useState(false);
@@ -156,6 +157,13 @@ export function EditProductDrawer({ productId, open, onClose }: EditProductDrawe
                   icon={<Tag className="h-4 w-4" />}
                   label="Phân loại"
                   badge={product.isClassified ? undefined : "Mới"}
+                />
+                <TabButton
+                  active={tab === "images"}
+                  onClick={() => setTab("images")}
+                  icon={<ImageIcon className="h-4 w-4" />}
+                  label="Hình ảnh"
+                  badge={product.images?.length || undefined}
                 />
                 <TabButton
                   active={tab === "history"}
@@ -339,6 +347,14 @@ export function EditProductDrawer({ productId, open, onClose }: EditProductDrawe
                     Phân loại sản phẩm
                   </button>
                 </div>
+              )}
+
+              {/* Images tab */}
+              {tab === "images" && (
+                <ProductImageGallery
+                  productId={productId!}
+                  productName={product.name}
+                />
               )}
 
               {/* History tab */}
