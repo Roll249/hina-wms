@@ -1,0 +1,58 @@
+version: "3.9"
+
+# ============================================================
+# Hina WMS - chạy CÙNG network với hina-e-comm
+# ============================================================
+# Trước khi chạy:
+#   1. Đảm bảo hina-e-comm đang chạy (docker-compose của nó)
+#   2. Apply migration: psql $DATABASE_URL -f backend/prisma/migrations/20260616100000_wms_init/migration.sql
+#   3. Tạo network chung: docker network create hina-network
+# ============================================================
+
+networks:
+  hina-network:
+    name: hina-network
+    external: true
+
+services:
+  # ============== WMS Backend ==============
+  hina-wms-backend:
+    build: ./backend
+    container_name: hina-wms-backend
+    ports:
+      - "7777:7777"
+    environment:
+      NODE_ENV: production
+      PORT: 7777
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN: 7d
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+    networks:
+      - hina-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:7777/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ============== WMS Frontend ==============
+  hina-wms-frontend:
+    build: ./frontend
+    container_name: hina-wms-frontend
+    ports:
+      - "4568:4568"
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    depends_on:
+      - hina-wms-backend
+    networks:
+      - hina-network
+    restart: unless-stopped

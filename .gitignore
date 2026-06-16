@@ -1,0 +1,82 @@
+# ============================================================
+# Hina-WMS .gitignore
+# ============================================================
+
+# ---- Node / pnpm ----
+node_modules/
+.pnpm-store/
+
+# ---- Build artifacts ----
+backend/dist/
+backend/dist-ssr/
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/tsconfig.tsbuildinfo
+*.tsbuildinfo
+
+# ---- Env files (NEVER commit secrets) ----
+.env
+.env.local
+.env.development
+.env.production
+.env.*.local
+!.env.example
+
+# ---- Logs ----
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+logs
+*.pid
+
+# ---- OS files ----
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ---- IDE / editor ----
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-project
+*.sublime-workspace
+.project
+.classpath
+.settings/
+
+# ---- Prisma ----
+backend/prisma/.env
+backend/prisma/migrations/dev/
+
+# ---- Test / coverage ----
+coverage/
+.nyc_output/
+*.lcov
+test-screenshots/
+test-results/
+playwright-report/
+playwright/.cache/
+
+# ---- Docker volumes (mounted by compose) ----
+.docker-data/
+*.sqlite
+*.sqlite3
+
+# ---- TypeScript ----
+*.tsbuildinfo
+next-env.d.ts
+
+# ---- Misc ----
+*.tgz
+.cache/
+.parcel-cache/
+.turbo/
+.eslintcache
