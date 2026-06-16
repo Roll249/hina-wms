@@ -4,6 +4,77 @@ Hệ thống quản lý kho (Warehouse Management System) cho **hina-e-comm**.
 
 WMS mini, mobile-first, tối giản cho nhân viên kho, **đồng bộ real-time** với web bán hàng theo nguyên tắc: **"web thế nào thì kho thế nào"**.
 
+## 🏗 Kiến trúc: Shared Database, Real-time Sync
+
+> ⚠️ **Điểm cốt lõi**: Hina-WMS và Hina-E-Comm dùng **CHUNG 1 PostgreSQL database** và **CHUNG 1 Redis instance**.
+> Hai hệ thống mount chung DB → mọi thay đổi từ web bán hàng (product, order, stock) được WMS thấy ngay lập tức,
+> và ngược lại mọi nhập/xuất từ WMS phản ánh real-time lên web bán hàng.
+
+```
+┌────────────────────┐         ┌────────────────────┐
+│   Hina-E-Comm      │         │     Hina-WMS       │
+│  (web bán hàng)    │         │  (mobile-first)    │
+│                    │         │                    │
+│  Next.js Frontend  │         │  Next.js Frontend  │
+│       ↕            │         │       ↕            │
+│  NestJS Backend    │         │  NestJS Backend    │
+│  Port 3000         │         │  Port 7777         │
+└──────────┬─────────┘         └──────────┬─────────┘
+           │                              │
+           │    ┌─────────────────────┐   │
+           └───▶│   PostgreSQL        │◀──┘
+           │    │   (CHUNG DATABASE)  │
+           │    │                     │
+           │    │ • Product           │
+           │    │ • ProductVariant    │
+           │    │ • Inventory ←── web update, wms update
+           │    │ • Order             │
+           │    │ • User              │
+           │    │ • WarehouseStaff    │
+           │    │ • Receipt (WMS)     │
+           │    │ • OutboundShipment  │
+           │    │ • InventoryMovement │
+           │    │   ...               │
+           │    └─────────────────────┘
+           │              │
+           │    ┌─────────────────────┐
+           └───▶│   Redis             │
+                │   (CHUNG)           │
+                │                     │
+                │ • Pub/Sub channels  │
+                │ • SSE event bus     │
+                │ • WebSocket fallback│
+                └─────────────────────┘
+```
+
+### Vì sao dùng chung DB?
+
+| Tính năng | Cách hoạt động |
+|-----------|----------------|
+| **Đồng bộ sản phẩm** | Web tạo/sửa Product → row mới trong `Product` table → WMS thấy ngay lập tức (cùng query, cùng schema) |
+| **Đồng bộ tồn kho** | Web adjust `Inventory.quantity` → WMS StockService đọc cùng table → hiển thị real-time không cần sync |
+| **Đồng bộ đơn hàng** | Web tạo `Order` (status=CONFIRMED) → WMS nhận qua Redis pub/sub → tự tạo `OutboundShipment` |
+| **Đồng bộ nhân viên** | Web quản lý `User` + `WarehouseStaff` → WMS auth dùng chung `JWT_SECRET` → login 1 chỗ, dùng 2 nơi |
+| **Real-time push** | Bất kỳ ai update `Inventory` → Redis publish event → SSE tới UI kia → UI re-fetch |
+
+### Tóm lại: **"web thế nào thì kho thế nào"**
+
+- Web bán thêm 10 cái → kho thấy ngay tồn tăng thêm 10
+- Kho nhập 50 cái → web bán thấy ngay tồn tăng thêm 50
+- Web tạo đơn → kho thấy picklist xuất hiện
+- Kho xuất hàng → đơn trên web chuyển sang SHIPPED
+
+**Không cần API sync, không cần cron job, không cần batch.** Vì chung DB nên **2 hệ thống chạy song song real-time**.
+
+### Schema & Prisma
+
+- WMS dùng `schema.prisma` bao gồm **cả models của e-comm** (Product, Inventory, Order, User...)
+  + **models riêng của WMS** (Receipt, OutboundShipment, InventoryMovement, WarehouseStaff, ...)
+- Vì sao? Để WMS có thể `prisma.product.findMany()` đọc product của e-comm, và `prisma.inventory.update()`
+  cập nhật tồn kho mà web bán sẽ thấy ngay ở query tiếp theo
+- Migration của WMS (`prisma/migrations/20260616100000_wms_init/`) chỉ tạo **các bảng mới**
+  (Receipt, OutboundShipment, InventoryMovement, WarehouseStaff...) — **không touch** các bảng e-comm
+
 ## 🚀 Quick Start (Local Dev)
 
 ```bash

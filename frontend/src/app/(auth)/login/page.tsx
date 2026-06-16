@@ -32,7 +32,7 @@ export default function LoginPage() {
       const { data } = await api.post("/auth/pin-login", { employeeCode, pin });
       setAuth(data.user, data.accessToken, data.refreshToken);
       toast.success("Đăng nhập thành công");
-      router.push("/dashboard");
+      window.location.href = "/dashboard";
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Đăng nhập thất bại");
     } finally {
@@ -47,7 +47,10 @@ export default function LoginPage() {
       const { data } = await api.post("/auth/login", { email, password });
       setAuth(data.user, data.accessToken, data.refreshToken);
       toast.success("Đăng nhập thành công");
-      router.push("/dashboard");
+      // Hard navigate để chắc chắn re-render lại toàn bộ layout
+      // vì Next.js router.push không re-mount providers, dẫn đến
+      // useAuthGuard có thể vẫn thấy isAuthenticated=false trong 1 frame.
+      window.location.href = "/dashboard";
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Đăng nhập thất bại");
     } finally {

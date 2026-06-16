@@ -15,8 +15,17 @@ export class StockService {
     lowStockOnly?: boolean;
     page?: number;
     pageSize?: number;
+    sortBy?: 'quantity' | 'name' | 'updatedAt';
+    sortDir?: 'asc' | 'desc';
   }) {
-    const { search, lowStockOnly, page = 1, pageSize = 50 } = params;
+    const {
+      search,
+      lowStockOnly,
+      page = 1,
+      pageSize = 50,
+      sortBy = 'updatedAt',
+      sortDir = 'desc',
+    } = params;
     const skip = (page - 1) * pageSize;
 
     // Tìm theo productCode hoặc product name
@@ -45,6 +54,16 @@ export class StockService {
       };
     }
 
+    // Order by: nếu sort theo 'name' thì cần order theo product.name
+    let orderBy: any;
+    if (sortBy === 'name') {
+      orderBy = { product: { name: sortDir } };
+    } else if (sortBy === 'quantity') {
+      orderBy = { quantity: sortDir };
+    } else {
+      orderBy = { updatedAt: sortDir };
+    }
+
     const [items, total] = await Promise.all([
       this.prisma.inventory.findMany({
         where,
@@ -66,7 +85,7 @@ export class StockService {
             },
           },
         },
-        orderBy: { quantity: 'asc' },
+        orderBy,
       }),
       this.prisma.inventory.count({ where }),
     ]);

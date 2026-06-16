@@ -15,6 +15,8 @@ export class StockController {
     @Query('lowStockOnly') lowStockOnly?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
+    @Query('sortBy') sortBy?: 'quantity' | 'name' | 'updatedAt',
+    @Query('sortDir') sortDir?: 'asc' | 'desc',
   ) {
     return this.stock.listStock({
       search,
@@ -22,6 +24,8 @@ export class StockController {
       lowStockOnly: lowStockOnly === 'true',
       page: page ? Number(page) : 1,
       pageSize: pageSize ? Number(pageSize) : 50,
+      sortBy,
+      sortDir,
     });
   }
 

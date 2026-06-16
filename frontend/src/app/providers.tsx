@@ -29,18 +29,23 @@ export function Providers({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * Hook bảo vệ route: nếu chưa login → redirect /login
+ * Hook bảo vệ route: nếu chưa login → redirect /login.
+ * Đợi Zustand persist hydrate xong trước khi quyết định redirect,
+ * tránh race condition khi reload trang đã login.
  */
 export function useAuthGuard() {
   const router = useRouter();
   const pathname = usePathname();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const hasHydrated = useAuthStore((s) => s._hasHydrated);
 
   useEffect(() => {
+    // Chưa hydrate xong → chờ, không redirect
+    if (!hasHydrated) return;
     if (!isAuthenticated && !pathname.startsWith("/login")) {
       router.replace("/login");
     }
-  }, [isAuthenticated, pathname, router]);
+  }, [isAuthenticated, hasHydrated, pathname, router]);
 
   return isAuthenticated;
 }
