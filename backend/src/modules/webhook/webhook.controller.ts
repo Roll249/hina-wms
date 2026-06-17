@@ -11,6 +11,7 @@ import { ConfigService } from '@nestjs/config';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { EventBusService, WmsEvent } from '../../common/events/event-bus.service';
 import { ShipmentsService } from '../shipments/shipments.service';
+import { WebStockService } from '../web-stock/web-stock.service';
 import { Public } from '../../common/decorators/auth.decorators';
 
 interface HinaWebhookPayload {
@@ -33,6 +34,7 @@ export class WebhookController {
     private readonly config: ConfigService,
     private readonly eventBus: EventBusService,
     private readonly shipments: ShipmentsService,
+    private readonly webStock: WebStockService,
   ) {}
 
   @Public()
@@ -52,8 +54,11 @@ export class WebhookController {
         break;
 
       case 'order.cancelled':
-        // TODO: nếu shipment đang PICKING/PICKED → cancel + restore tồn
-        this.logger.log(`Order cancelled: ${payload.data?.orderId}`);
+        await this.handleOrderCancelled(payload.data);
+        break;
+
+      case 'order.item_sold':
+        await this.handleOrderItemSold(payload.data);
         break;
 
       case 'product.changed':
@@ -86,6 +91,51 @@ export class WebhookController {
     } catch (err) {
       this.logger.error(
         `Failed to create shipment for order ${data.orderId}: ${(err as Error).message}`,
+      );
+    }
+  }
+
+  /**
+   * Đơn bị hủy: giảm webSoldQty (hoàn lại "đã bán").
+   * data: { orderId, items: [{ productId, variantId, quantity }] }
+   */
+  private async handleOrderCancelled(data: any) {
+    if (!data?.orderId || !data?.items?.length) {
+      this.logger.log(`Order cancelled (no items): ${data?.orderId}`);
+      return;
+    }
+    try {
+      await this.webStock.syncFromWeb({
+        items: data.items.map((it: any) => ({
+          productId: it.productId,
+          variantId: it.variantId,
+          deltaSold: -Number(it.quantity || 0), // trừ lại
+        })),
+      });
+    } catch (err) {
+      this.logger.error(
+        `Failed to sync cancel for order ${data.orderId}: ${(err as Error).message}`,
+      );
+    }
+  }
+
+  /**
+   * Đơn có item mới (CONFIRMED): tăng webSoldQty.
+   * data: { orderId, items: [{ productId, variantId, quantity }] }
+   */
+  private async handleOrderItemSold(data: any) {
+    if (!data?.items?.length) return;
+    try {
+      await this.webStock.syncFromWeb({
+        items: data.items.map((it: any) => ({
+          productId: it.productId,
+          variantId: it.variantId,
+          deltaSold: Number(it.quantity || 0),
+        })),
+      });
+    } catch (err) {
+      this.logger.error(
+        `Failed to sync sold: ${(err as Error).message}`,
       );
     }
   }

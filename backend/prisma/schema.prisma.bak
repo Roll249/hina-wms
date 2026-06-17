@@ -789,14 +789,6 @@ model Inventory {
   reservedQty       Int      @default(0)
   lowStockThreshold Int      @default(10)
 
-  // ===== Web stock (do WMS quản lý) =====
-  // - webListedQty: số lượng tối đa cho phép bán trên web (admin set tại WMS)
-  // - webSoldQty:   số lượng web đã bán (đồng bộ từ webhook)
-  // - webReservedQty: số lượng web đang reserve trong cart (đồng bộ từ webhook)
-  webListedQty      Int      @default(0)
-  webSoldQty        Int      @default(0)
-  webReservedQty    Int      @default(0)
-
   product           Product?       @relation(fields: [productId], references: [id], onDelete: Cascade)
   variant           ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
 

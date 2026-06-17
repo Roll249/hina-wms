@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Search, AlertTriangle, Edit3, FolderTree, Plus, Settings2 } from "lucide-react";
+import { Search, AlertTriangle, Edit3, FolderTree, Plus, Settings2, Globe } from "lucide-react";
 import {
   useStock,
   useClassificationCounts,
@@ -15,6 +15,7 @@ import { formatNumber, cn } from "@/lib/utils";
 import { useSse } from "@/hooks/use-sse";
 import { useQueryClient } from "@tanstack/react-query";
 import { EditProductDrawer } from "@/components/stock/edit-product-drawer";
+import { WebStockModal } from "@/components/stock/web-stock-modal";
 
 type Tab = "unclassified" | "classified";
 
@@ -24,12 +25,14 @@ export default function StockPage() {
   const [tab, setTab] = useState<Tab>("unclassified");
   const [categoryFilter, setCategoryFilter] = useState<string>("");
   const [editProductId, setEditProductId] = useState<string | null>(null);
+  const [webStockProductId, setWebStockProductId] = useState<string | null>(null);
   const qc = useQueryClient();
 
   // Auto-refetch khi có stock event
   useSse("/sse/stream", (msg) => {
-    if (msg.type === "stock.changed") {
+    if (msg.type === "stock.changed" || msg.type === "web_stock.changed") {
       qc.invalidateQueries({ queryKey: ["stock"] });
+      qc.invalidateQueries({ queryKey: ["web-stock-summary"] });
     }
   });
 
@@ -271,13 +274,23 @@ export default function StockPage() {
                     {formatNumber(item.available)}
                   </p>
                   <p className="text-[10px] text-gray-400">có thể bán</p>
-                  <button
-                    onClick={() => item.productId && setEditProductId(item.productId)}
-                    className="mt-1 px-2 py-1 rounded text-[10px] font-medium bg-primary-50 text-primary-500 hover:bg-primary-100 flex items-center gap-1"
-                  >
-                    <Edit3 className="h-3 w-3" />
-                    Sửa
-                  </button>
+                  <div className="flex flex-col gap-1 mt-1">
+                    <button
+                      onClick={() => item.productId && setWebStockProductId(item.productId)}
+                      className="px-2 py-1 rounded text-[10px] font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 flex items-center gap-1"
+                      title="Set số lượng đẩy lên web"
+                    >
+                      <Globe className="h-3 w-3" />
+                      Web
+                    </button>
+                    <button
+                      onClick={() => item.productId && setEditProductId(item.productId)}
+                      className="px-2 py-1 rounded text-[10px] font-medium bg-primary-50 text-primary-500 hover:bg-primary-100 flex items-center gap-1"
+                    >
+                      <Edit3 className="h-3 w-3" />
+                      Sửa
+                    </button>
+                  </div>
                 </div>
               </div>
             </Card>
@@ -295,6 +308,12 @@ export default function StockPage() {
         productId={editProductId}
         open={!!editProductId}
         onClose={() => setEditProductId(null)}
+      />
+
+      <WebStockModal
+        productId={webStockProductId}
+        open={!!webStockProductId}
+        onClose={() => setWebStockProductId(null)}
       />
     </div>
   );
