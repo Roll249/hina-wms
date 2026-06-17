@@ -142,7 +142,7 @@ export function EditProductDrawer({ productId, open, onClose }: EditProductDrawe
         ) : (
           <>
             {/* Tabs */}
-            <div className="border-b px-4 bg-white sticky top-0 z-10">
+            <div className="border-b px-4 bg-white sticky top-0 z-10 flex items-center justify-between">
               <div className="flex gap-1">
                 <TabButton
                   active={tab === "edit"}
@@ -173,6 +173,13 @@ export function EditProductDrawer({ productId, open, onClose }: EditProductDrawe
                   badge={history.length || undefined}
                 />
               </div>
+              <button
+                onClick={onClose}
+                className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 ml-2"
+                title="Đóng (Esc)"
+              >
+                <X className="h-5 w-5" />
+              </button>
             </div>
 
             {/* Body */}

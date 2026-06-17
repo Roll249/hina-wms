@@ -1,4 +1,9 @@
-import { IsOptional, IsString, IsBoolean, IsNumber, MinLength, MaxLength, Matches } from 'class-validator';
+import { IsOptional, IsString, IsBoolean, IsNumber, IsInt, MinLength, MaxLength, Min, Max, ValidateIf } from 'class-validator';
+
+// Helper: cho phép null khi update (vd: xóa image, set parent = null)
+function ValidateIfNullable(): PropertyDecorator {
+  return ValidateIf((o: any) => o !== undefined);
+}
 
 export class CreateCategoryDto {
   @IsString()
@@ -6,55 +11,117 @@ export class CreateCategoryDto {
   @MaxLength(100)
   name: string;
 
+  @IsOptional()
   @IsString()
-  @MinLength(1)
-  @MaxLength(120)
-  @Matches(/^[a-z0-9-]+$/, { message: 'slug chỉ chứa chữ thường, số và dấu gạch ngang' })
-  slug: string;
+  @MaxLength(255)
+  slug?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(500)
   description?: string;
 
   @IsOptional()
-  @IsString()
-  parentId?: string;
-
-  @IsOptional()
-  @IsString()
-  icon?: string;
-
-  @IsOptional()
-  @IsNumber()
-  sortOrder?: number;
-
-  @IsOptional()
-  @IsBoolean()
-  isActive?: boolean;
-}
-
-export class UpdateCategoryDto {
-  @IsOptional()
-  @IsString()
-  name?: string;
-
-  @IsOptional()
-  @IsString()
-  description?: string;
-
-  @IsOptional()
+  @ValidateIfNullable()
   @IsString()
   parentId?: string | null;
 
   @IsOptional()
   @IsString()
+  @MaxLength(255)
   icon?: string;
 
   @IsOptional()
-  @IsNumber()
+  @IsString()
+  @MaxLength(500)
+  imageUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  bannerImageUrl?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
   sortOrder?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(1)
+  taxRate?: number;
 
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  showOnMegaMenu?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  showOnHomepageCard?: boolean;
+}
+
+export class UpdateCategoryDto {
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(100)
+  name?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  slug?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  description?: string;
+
+  @IsOptional()
+  @ValidateIfNullable()
+  @IsString()
+  parentId?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  icon?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  imageUrl?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  bannerImageUrl?: string | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  sortOrder?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(1)
+  taxRate?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  showOnMegaMenu?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  showOnHomepageCard?: boolean;
 }

@@ -55,16 +55,12 @@ export class UploadService {
   }
 
     /**
-     * Tạo presigned URL cho upload ảnh sản phẩm.
-     * Returns { uploadUrl, publicUrl, key } - frontend PUT lên uploadUrl, lưu publicUrl vào DB.
-     *
-     * Vì MINIO_PUBLIC_ENDPOINT là https://ecom.neulon.io.vn/storage (nginx proxy)
-     * nên uploadUrl phải dùng public client (browser PUT được) nhưng cần rewrite host
-     * để browser có thể reach được từ bên ngoài.
+     * Generic presigned URL cho upload bất kỳ file nào vào MinIO.
+     * @param folder Dạng "categories/categories" hoặc "categories/banners" hoặc "products/:id"
      */
-    async generatePresignedUrlForProduct(productId: string, contentType: string) {
+    async generatePresignedUrl(folder: string, contentType: string) {
       const ext = CONTENT_TYPE_EXTENSIONS[contentType] ?? 'jpg';
-      const key = `products/${productId}/${uuidv4()}.${ext}`;
+      const key = `${folder.replace(/^\/+|\/+$/g, '')}/${crypto.randomUUID()}.${ext}`;
 
       const command = new PutObjectCommand({
         Bucket: this.bucket,

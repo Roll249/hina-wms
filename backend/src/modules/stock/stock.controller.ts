@@ -3,7 +3,7 @@ import { Request } from 'express';
 import { StockService } from './stock.service';
 import { Roles } from '../../common/decorators/auth.decorators';
 import { Role } from '@prisma/client';
-import { GetPresignedUrlDto, AddProductImageDto, UpdateProductImageDto } from '../upload/dto/upload.dto';
+import { GetProductImagePresignedDto, AddProductImageDto, UpdateProductImageDto } from '../upload/dto/upload.dto';
 
 interface AuthedRequest extends Request {
   user: {
@@ -161,7 +161,7 @@ export class StockController {
   @Post('product/:id/images/presigned')
   presignedImageUpload(
     @Param('id') productId: string,
-    @Body() dto: GetPresignedUrlDto,
+    @Body() dto: GetProductImagePresignedDto,
   ) {
     return this.stock.generateProductImagePresignedUrl(productId, dto.contentType);
   }

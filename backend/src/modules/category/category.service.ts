@@ -20,8 +20,13 @@ export class CategoryService {
         parentId: true,
         description: true,
         icon: true,
+        imageUrl: true,
+        bannerImageUrl: true,
+        taxRate: true,
         sortOrder: true,
         isActive: true,
+        showOnMegaMenu: true,
+        showOnHomepageCard: true,
         _count: {
           select: { products: { where: { deletedAt: null } } },
         },
@@ -91,17 +96,19 @@ export class CategoryService {
    * sẽ tự động xuất hiện trên web.
    */
   async create(dto: CreateCategoryDto) {
+    // Auto-slug từ name nếu không cung cấp
+    let slug = dto.slug?.trim();
+    if (!slug) slug = this.slugify(dto.name);
+    slug = this.slugify(slug);
+
     // Check slug unique
-    const existing = await this.prisma.category.findUnique({ where: { slug: dto.slug } });
-    if (existing) throw new ConflictException(`Slug "${dto.slug}" đã tồn tại`);
+    const existing = await this.prisma.category.findUnique({ where: { slug } });
+    if (existing) throw new ConflictException(`Slug "${slug}" đã tồn tại`);
 
     // Check parent exists (nếu có)
     if (dto.parentId) {
       const parent = await this.prisma.category.findUnique({ where: { id: dto.parentId } });
       if (!parent) throw new BadRequestException(`Parent category không tồn tại`);
-
-      // Tránh tạo cycle: parent không được là descendant của category này
-      // (vì category mới chưa có id nên chưa có descendant → pass)
     }
 
     // Auto sortOrder: lớn nhất + 1 trong cùng parent
@@ -118,13 +125,18 @@ export class CategoryService {
     const created = await this.prisma.category.create({
       data: {
         id: crypto.randomUUID(),
-        name: dto.name,
-        slug: dto.slug,
+        name: dto.name.trim(),
+        slug,
         description: dto.description ?? null,
         parentId: dto.parentId ?? null,
         icon: dto.icon ?? null,
+        imageUrl: dto.imageUrl ?? null,
+        bannerImageUrl: dto.bannerImageUrl ?? null,
+        taxRate: dto.taxRate ?? null,
         sortOrder,
         isActive: dto.isActive ?? true,
+        showOnMegaMenu: dto.showOnMegaMenu ?? false,
+        showOnHomepageCard: dto.showOnHomepageCard ?? false,
         updatedAt: new Date(),
       },
     });
@@ -132,7 +144,7 @@ export class CategoryService {
   }
 
   /**
-   * Cập nhật category.
+   * Cập nhật category - hỗ trợ tất cả fields từ e-comm form.
    */
   async update(id: string, dto: UpdateCategoryDto) {
     const existing = await this.prisma.category.findUnique({ where: { id } });
@@ -144,7 +156,7 @@ export class CategoryService {
 
     if (dto.parentId) {
       const parent = await this.prisma.category.findUnique({ where: { id: dto.parentId } });
-      if (!parent) throw new BadRequestException('Parent category không tồn tại');
+      if (!parent) throw new BadRequestException(`Parent category không tồn tại`);
 
       // Check cycle: parent mới không được là descendant của category này
       const isDescendant = await this.isDescendant(dto.parentId, id);
@@ -153,19 +165,46 @@ export class CategoryService {
       }
     }
 
+    // Slug unique check nếu đổi
+    if (dto.slug && dto.slug !== existing.slug) {
+      const dup = await this.prisma.category.findUnique({ where: { slug: dto.slug } });
+      if (dup && dup.id !== id) throw new ConflictException(`Slug "${dto.slug}" đã tồn tại`);
+    }
+
     const updated = await this.prisma.category.update({
       where: { id },
       data: {
-        name: dto.name ?? undefined,
+        name: dto.name?.trim() ?? undefined,
+        slug: dto.slug ?? undefined,
         description: dto.description ?? undefined,
         parentId: dto.parentId === undefined ? undefined : dto.parentId,
         icon: dto.icon ?? undefined,
+        imageUrl: dto.imageUrl === undefined ? undefined : dto.imageUrl,
+        bannerImageUrl: dto.bannerImageUrl === undefined ? undefined : dto.bannerImageUrl,
+        taxRate: dto.taxRate === undefined ? undefined : dto.taxRate,
         sortOrder: dto.sortOrder ?? undefined,
         isActive: dto.isActive ?? undefined,
+        showOnMegaMenu: dto.showOnMegaMenu ?? undefined,
+        showOnHomepageCard: dto.showOnHomepageCard ?? undefined,
         updatedAt: new Date(),
       },
     });
     return updated;
+  }
+
+  /**
+   * Slugify: tương tự form, dùng cho cả input name và input slug.
+   */
+  private slugify(input: string): string {
+    return input
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-z0-9\s-]/g, '')
+      .trim()
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .slice(0, 80);
   }
 
   /**

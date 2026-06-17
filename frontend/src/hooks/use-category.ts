@@ -10,8 +10,13 @@ export interface CategoryNode {
   parentId: string | null;
   description: string | null;
   icon: string | null;
+  imageUrl: string | null;
+  bannerImageUrl: string | null;
+  taxRate: number | null;
   sortOrder: number;
   isActive: boolean;
+  showOnMegaMenu: boolean;
+  showOnHomepageCard: boolean;
   productCount: number;
   children: CategoryNode[];
 }
@@ -79,12 +84,17 @@ export function useCreateCategory() {
   return useMutation({
     mutationFn: async (body: {
       name: string;
-      slug: string;
-      parentId?: string;
+      slug?: string;
+      parentId?: string | null;
       description?: string;
       icon?: string;
+      imageUrl?: string | null;
+      bannerImageUrl?: string | null;
+      taxRate?: number;
       sortOrder?: number;
       isActive?: boolean;
+      showOnMegaMenu?: boolean;
+      showOnHomepageCard?: boolean;
     }) => {
       const { data } = await api.post("/categories", body);
       return data;
@@ -111,11 +121,17 @@ export function useUpdateCategory() {
       id: string;
       patch: {
         name?: string;
+        slug?: string;
         description?: string;
         parentId?: string | null;
         icon?: string;
+        imageUrl?: string | null;
+        bannerImageUrl?: string | null;
+        taxRate?: number;
         sortOrder?: number;
         isActive?: boolean;
+        showOnMegaMenu?: boolean;
+        showOnHomepageCard?: boolean;
       };
     }) => {
       const { data } = await api.patch(`/categories/${id}`, patch);

@@ -631,7 +631,7 @@ export class StockService {
   async generateProductImagePresignedUrl(productId: string, contentType: string) {
     const product = await this.prisma.product.findUnique({ where: { id: productId } });
     if (!product) throw new NotFoundException('Sản phẩm không tồn tại');
-    return this.upload.generatePresignedUrlForProduct(productId, contentType);
+    return this.upload.generatePresignedUrl(`products/${productId}`, contentType);
   }
 
   /**

@@ -19,7 +19,7 @@ import {
 } from "@/hooks/use-category";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CreateCategoryModal } from "@/components/category/create-category-modal";
+import { CategoryFormModal } from "@/components/category/category-form-modal";
 import { cn } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
@@ -29,6 +29,7 @@ function CategoryTreeNode({
   depth = 0,
   onAddChild,
   onDelete,
+  onEdit,
   expanded,
   toggle,
 }: {
@@ -36,6 +37,7 @@ function CategoryTreeNode({
   depth?: number;
   onAddChild: (parentId: string) => void;
   onDelete: (id: string, name: string) => void;
+  onEdit: (node: CategoryNode) => void;
   expanded: Set<string>;
   toggle: (id: string) => void;
 }) {
@@ -104,6 +106,13 @@ function CategoryTreeNode({
 
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
+            onClick={() => onEdit(node)}
+            className="p-1 rounded hover:bg-blue-100 text-blue-600"
+            title="Sửa"
+          >
+            <Edit3 className="w-3.5 h-3.5" />
+          </button>
+          <button
             onClick={() => onAddChild(node.id)}
             className="p-1 rounded hover:bg-blue-100 text-blue-600"
             title="Thêm sub-category"
@@ -130,6 +139,7 @@ function CategoryTreeNode({
               depth={depth + 1}
               onAddChild={onAddChild}
               onDelete={onDelete}
+              onEdit={onEdit}
               expanded={expanded}
               toggle={toggle}
             />
@@ -149,6 +159,7 @@ export default function CategoriesPage() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [showCreate, setShowCreate] = useState(false);
   const [defaultParent, setDefaultParent] = useState<string | undefined>();
+  const [editingCategory, setEditingCategory] = useState<CategoryNode | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{
     id: string;
     name: string;
@@ -163,8 +174,14 @@ export default function CategoriesPage() {
   };
 
   const handleAddChild = (parentId: string) => {
+    setEditingCategory(null);
     setDefaultParent(parentId);
     setShowCreate(true);
+  };
+
+  const handleEdit = (node: CategoryNode) => {
+    setShowCreate(false);
+    setEditingCategory(node);
   };
 
   const handleDelete = (id: string, name: string) => {
@@ -264,6 +281,7 @@ export default function CategoriesPage() {
                   node={root}
                   onAddChild={handleAddChild}
                   onDelete={handleDelete}
+                  onEdit={handleEdit}
                   expanded={expanded}
                   toggle={toggle}
                 />
@@ -273,11 +291,15 @@ export default function CategoriesPage() {
         )}
       </Card>
 
-      {/* Create modal */}
-      <CreateCategoryModal
-        open={showCreate}
-        onClose={() => setShowCreate(false)}
+      {/* Create / Edit modal */}
+      <CategoryFormModal
+        open={showCreate || editingCategory !== null}
+        onClose={() => {
+          setShowCreate(false);
+          setEditingCategory(null);
+        }}
         defaultParentId={defaultParent}
+        category={editingCategory}
       />
 
       {/* Confirm delete dialog */}
