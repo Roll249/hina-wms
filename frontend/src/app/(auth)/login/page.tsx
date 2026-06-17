@@ -59,7 +59,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-primary-700 to-primary-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-b from-primary-600 to-primary-800 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-6 text-white">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white/10 backdrop-blur mb-3">
@@ -74,7 +74,7 @@ export default function LoginPage() {
             <button
               onClick={() => setMode("pin")}
               className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
-                mode === "pin" ? "bg-white text-primary-700 shadow-sm" : "text-gray-600"
+                mode === "pin" ? "bg-white text-primary-600 shadow-sm" : "text-gray-600"
               }`}
             >
               PIN nhanh
@@ -82,7 +82,7 @@ export default function LoginPage() {
             <button
               onClick={() => setMode("password")}
               className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
-                mode === "password" ? "bg-white text-primary-700 shadow-sm" : "text-gray-600"
+                mode === "password" ? "bg-white text-primary-600 shadow-sm" : "text-gray-600"
               }`}
             >
               Email + MK

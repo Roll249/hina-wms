@@ -83,7 +83,7 @@ function ReceiptsList() {
       {data?.items?.map((r: any) => (
         <Card key={r.id} padding="sm">
           <div className="flex items-center justify-between mb-1">
-            <span className="font-mono text-sm text-primary-700">{r.receiptNumber}</span>
+            <span className="font-mono text-sm text-primary-600">{r.receiptNumber}</span>
             <Badge variant={RECEIPT_STATUS[r.status]?.variant || "gray"}>
               {RECEIPT_STATUS[r.status]?.label || r.status}
             </Badge>
@@ -121,7 +121,7 @@ function ShipmentsList() {
       {data?.items?.map((s: any) => (
         <Card key={s.id} padding="sm">
           <div className="flex items-center justify-between mb-1">
-            <span className="font-mono text-sm text-primary-700">{s.shipmentNumber}</span>
+            <span className="font-mono text-sm text-primary-600">{s.shipmentNumber}</span>
             <Badge variant={SHIP_STATUS[s.status]?.variant || "gray"}>
               {SHIP_STATUS[s.status]?.label || s.status}
             </Badge>

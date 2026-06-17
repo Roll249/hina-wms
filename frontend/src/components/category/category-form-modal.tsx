@@ -241,7 +241,7 @@ export function CategoryFormModal({
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-primary-100 text-primary-700 flex items-center justify-center">
+            <div className="w-8 h-8 rounded bg-primary-100 text-primary-600 flex items-center justify-center">
               {isEdit ? <Save className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
             </div>
             <div>
@@ -279,7 +279,7 @@ export function CategoryFormModal({
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 placeholder="VD: Hrnky a lahve"
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none text-sm"
+                className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:border-primary-400 focus:ring-1 focus:ring-primary-400 outline-none text-sm"
                 autoFocus
               />
             </div>
@@ -313,7 +313,7 @@ export function CategoryFormModal({
               <select
                 value={form.parentId}
                 onChange={(e) => setForm({ ...form, parentId: e.target.value })}
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none text-sm"
+                className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:border-primary-400 focus:ring-1 focus:ring-primary-400 outline-none text-sm"
               >
                 <option value="">— Root (cấp cao nhất) —</option>
                 {flatCategories.map((c) => (
@@ -333,7 +333,7 @@ export function CategoryFormModal({
                 value={form.icon}
                 onChange={(e) => setForm({ ...form, icon: e.target.value })}
                 placeholder="🎁 hoặc https://..."
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none text-sm"
+                className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:border-primary-400 focus:ring-1 focus:ring-primary-400 outline-none text-sm"
               />
             </div>
           </div>
@@ -475,7 +475,7 @@ export function CategoryFormModal({
                 value={form.taxRate}
                 onChange={(e) => setForm({ ...form, taxRate: e.target.value })}
                 placeholder="vd: 0.21"
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none text-sm"
+                className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:border-primary-400 focus:ring-1 focus:ring-primary-400 outline-none text-sm"
               />
             </div>
 
@@ -488,7 +488,7 @@ export function CategoryFormModal({
                 value={form.sortOrder}
                 onChange={(e) => setForm({ ...form, sortOrder: e.target.value })}
                 placeholder="Auto"
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none text-sm"
+                className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:border-primary-400 focus:ring-1 focus:ring-primary-400 outline-none text-sm"
               />
             </div>
 
@@ -501,7 +501,7 @@ export function CategoryFormModal({
                   type="checkbox"
                   checked={form.isActive}
                   onChange={(e) => setForm({ ...form, isActive: e.target.checked })}
-                  className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                  className="w-4 h-4 rounded border-gray-300 text-primary-500 focus:ring-primary-400"
                 />
                 <span className="text-sm text-gray-700">Hiển thị trên web</span>
               </label>
@@ -517,7 +517,7 @@ export function CategoryFormModal({
                 onChange={(e) =>
                   setForm({ ...form, showOnMegaMenu: e.target.checked })
                 }
-                className="w-4 h-4 mt-0.5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                className="w-4 h-4 mt-0.5 rounded border-gray-300 text-primary-500 focus:ring-primary-400"
               />
               <div>
                 <div className="text-sm font-medium text-gray-900">
@@ -536,7 +536,7 @@ export function CategoryFormModal({
                 onChange={(e) =>
                   setForm({ ...form, showOnHomepageCard: e.target.checked })
                 }
-                className="w-4 h-4 mt-0.5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                className="w-4 h-4 mt-0.5 rounded border-gray-300 text-primary-500 focus:ring-primary-400"
               />
               <div>
                 <div className="text-sm font-medium text-gray-900">
@@ -571,7 +571,7 @@ export function CategoryFormModal({
           <button
             onClick={submit}
             disabled={submitting || !form.name.trim()}
-            className="px-4 py-2 rounded-lg text-sm font-medium bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+            className="px-4 py-2 rounded text-sm font-medium bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
           >
             {submitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
             {isEdit ? "Lưu thay đổi" : "Tạo category"}

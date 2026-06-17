@@ -36,7 +36,7 @@ export function AppShell({ children, title }: AppShellProps) {
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
-      <header className="bg-primary-700 text-white shadow-sm sticky top-0 z-10">
+      <header className="bg-primary-500 text-white shadow-sm sticky top-0 z-10">
         <div className="mx-auto max-w-7xl px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <h1 className="text-lg font-semibold">Hina WMS</h1>

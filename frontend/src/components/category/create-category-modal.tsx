@@ -118,7 +118,7 @@ export function CreateCategoryModal({ open, onClose, defaultParentId }: Props) {
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-primary-100 text-primary-700 flex items-center justify-center">
+            <div className="w-8 h-8 rounded bg-primary-100 text-primary-600 flex items-center justify-center">
               <Plus className="w-4 h-4" />
             </div>
             <h2 className="text-base font-semibold text-gray-900">
@@ -150,7 +150,7 @@ export function CreateCategoryModal({ open, onClose, defaultParentId }: Props) {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="VD: Dřevěné dekorace"
-              className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none text-sm"
+              className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:border-primary-400 focus:ring-1 focus:ring-primary-400 outline-none text-sm"
               autoFocus
             />
           </div>
@@ -187,7 +187,7 @@ export function CreateCategoryModal({ open, onClose, defaultParentId }: Props) {
             <select
               value={parentId}
               onChange={(e) => setParentId(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none text-sm"
+              className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:border-primary-400 focus:ring-1 focus:ring-primary-400 outline-none text-sm"
             >
               <option value="">— Root (cấp cao nhất) —</option>
               {flatCategories.map((c) => (
@@ -224,7 +224,7 @@ export function CreateCategoryModal({ open, onClose, defaultParentId }: Props) {
                 value={sortOrder}
                 onChange={(e) => setSortOrder(e.target.value)}
                 placeholder="Auto (max+1)"
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none text-sm"
+                className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:border-primary-400 focus:ring-1 focus:ring-primary-400 outline-none text-sm"
               />
             </div>
 
@@ -264,7 +264,7 @@ export function CreateCategoryModal({ open, onClose, defaultParentId }: Props) {
           <button
             onClick={submit}
             disabled={create.isPending || !name.trim() || !slug.trim()}
-            className="px-4 py-2 rounded-lg text-sm font-medium bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 rounded text-sm font-medium bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {create.isPending ? "Đang tạo..." : "Tạo category"}
           </button>

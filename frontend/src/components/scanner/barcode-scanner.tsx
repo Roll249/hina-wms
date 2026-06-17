@@ -39,7 +39,7 @@ export function BarcodeScanner({ onScan, enabled = true, className }: BarcodeSca
           onClick={() => setActiveTab("usb")}
           className={cn(
             "flex-1 py-2 px-3 text-sm font-medium rounded-md flex items-center justify-center gap-2",
-            activeTab === "usb" ? "bg-white text-primary-700 shadow-sm" : "text-gray-600",
+            activeTab === "usb" ? "bg-white text-primary-600 shadow-sm" : "text-gray-600",
           )}
         >
           <Usb className="h-4 w-4" /> USB Scanner
@@ -49,7 +49,7 @@ export function BarcodeScanner({ onScan, enabled = true, className }: BarcodeSca
           disabled={!hasCamera}
           className={cn(
             "flex-1 py-2 px-3 text-sm font-medium rounded-md flex items-center justify-center gap-2",
-            activeTab === "camera" ? "bg-white text-primary-700 shadow-sm" : "text-gray-600",
+            activeTab === "camera" ? "bg-white text-primary-600 shadow-sm" : "text-gray-600",
             !hasCamera && "opacity-50 cursor-not-allowed",
           )}
         >

@@ -43,7 +43,7 @@ export function TabsTrigger({ value, children, className }: {
       onClick={() => ctx.onValueChange(value)}
       className={cn(
         "flex-1 py-2 px-3 text-sm font-medium rounded-md",
-        isActive ? "bg-white text-primary-700 shadow-sm" : "text-gray-600",
+        isActive ? "bg-white text-primary-600 shadow-sm" : "text-gray-600",
         className,
       )}
     >

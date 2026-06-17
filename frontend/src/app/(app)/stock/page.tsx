@@ -202,7 +202,7 @@ export default function StockPage() {
               localStorage.removeItem("wms-auth-storage");
               window.location.href = "/login";
             }}
-            className="px-4 py-2 rounded-lg bg-primary-600 text-white text-sm font-medium hover:bg-primary-700"
+            className="px-4 py-2 rounded bg-primary-500 text-white text-sm font-medium hover:bg-primary-600"
           >
             Đăng nhập lại
           </button>
@@ -273,7 +273,7 @@ export default function StockPage() {
                   <p className="text-[10px] text-gray-400">có thể bán</p>
                   <button
                     onClick={() => item.productId && setEditProductId(item.productId)}
-                    className="mt-1 px-2 py-1 rounded text-[10px] font-medium bg-primary-50 text-primary-700 hover:bg-primary-100 flex items-center gap-1"
+                    className="mt-1 px-2 py-1 rounded text-[10px] font-medium bg-primary-50 text-primary-500 hover:bg-primary-100 flex items-center gap-1"
                   >
                     <Edit3 className="h-3 w-3" />
                     Sửa

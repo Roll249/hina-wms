@@ -195,7 +195,7 @@ export default function ReceivePage() {
               onClick={() => setTab(t.key as Tab)}
               className={cn(
                 "flex-1 py-2 text-sm font-medium rounded-md flex items-center justify-center gap-1.5",
-                tab === t.key ? "bg-white text-primary-700 shadow-sm" : "text-gray-600",
+                tab === t.key ? "bg-white text-primary-600 shadow-sm" : "text-gray-600",
               )}
             >
               <Icon className="h-4 w-4" />
@@ -320,7 +320,7 @@ export default function ReceivePage() {
               type="file"
               accept=".csv"
               onChange={handleFileUpload}
-              className="block w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100"
+              className="block w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded file:border-0 file:bg-primary-50 file:text-primary-600 hover:file:bg-primary-100"
             />
           </label>
           <p className="text-xs text-gray-500">
@@ -355,7 +355,7 @@ export default function ReceivePage() {
                     <p className="text-sm text-gray-700 truncate">{item.productName}</p>
                   )}
                 </div>
-                <span className="text-lg font-semibold text-primary-700">
+                <span className="text-lg font-semibold text-primary-500">
                   ×{item.receivedQuantity}
                 </span>
                 <Button

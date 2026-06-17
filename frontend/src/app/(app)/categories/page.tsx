@@ -73,7 +73,7 @@ function CategoryTreeNode({
         <TreePine
           className={cn(
             "w-4 h-4",
-            isRoot ? "text-primary-600" : "text-gray-400",
+            isRoot ? "text-primary-500" : "text-gray-400",
           )}
         />
 
@@ -227,7 +227,7 @@ export default function CategoriesPage() {
               setDefaultParent(undefined);
               setShowCreate(true);
             }}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary-600 text-white text-sm font-medium hover:bg-primary-700"
+            className="flex items-center gap-1.5 px-3 py-2 rounded bg-primary-500 text-white text-sm font-medium hover:bg-primary-600"
           >
             <Plus className="w-4 h-4" />
             Tạo mới

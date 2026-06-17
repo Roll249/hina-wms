@@ -129,7 +129,7 @@ export function ProductImageGallery({ productId, productName }: Props) {
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={upload.isPending}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-600 text-white text-xs font-medium hover:bg-primary-700 disabled:opacity-50"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-primary-500 text-white text-xs font-medium hover:bg-primary-600 disabled:opacity-50"
         >
           {upload.isPending ? (
             <Loader2 className="w-3.5 h-3.5 animate-spin" />

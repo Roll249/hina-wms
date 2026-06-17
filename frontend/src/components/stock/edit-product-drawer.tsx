@@ -282,7 +282,7 @@ export function EditProductDrawer({ productId, open, onClose }: EditProductDrawe
                     <button
                       onClick={handleSave}
                       disabled={changes.length === 0 || editMutation.isPending}
-                      className="px-4 py-2 rounded-lg bg-primary-600 text-white text-sm font-medium hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                      className="px-4 py-2 rounded bg-primary-500 text-white text-sm font-medium hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                     >
                       {editMutation.isPending && (
                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -345,7 +345,7 @@ export function EditProductDrawer({ productId, open, onClose }: EditProductDrawe
                       selectedCategoryId === product.categoryId ||
                       classifyMutation.isPending
                     }
-                    className="w-full px-4 py-2 rounded-lg bg-primary-600 text-white text-sm font-medium hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    className="w-full px-4 py-2 rounded bg-primary-500 text-white text-sm font-medium hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     {classifyMutation.isPending && (
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -437,7 +437,7 @@ function TabButton({
       className={cn(
         "px-3 py-2 text-sm font-medium flex items-center gap-1.5 border-b-2",
         active
-          ? "border-primary-600 text-primary-700"
+          ? "border-primary-400 text-primary-500"
           : "border-transparent text-gray-600 hover:text-gray-900",
       )}
     >
@@ -448,7 +448,7 @@ function TabButton({
           className={cn(
             "ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold",
             active
-              ? "bg-primary-100 text-primary-700"
+              ? "bg-primary-50 text-primary-500"
               : "bg-gray-200 text-gray-700",
           )}
         >
