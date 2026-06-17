@@ -1,12 +1,32 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { PackageOpen, PackageMinus, AlertTriangle, TrendingUp } from "lucide-react";
+import {
+  PackageOpen,
+  PackageMinus,
+  AlertTriangle,
+  TrendingUp,
+  Plus,
+  ShoppingCart,
+  FileInput,
+  Truck,
+  Layers,
+} from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import api from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
+
+type DashboardStats = {
+  totalSkus: number;
+  totalInventory: number;
+  lowStockCount: number;
+  pendingShipments: number;
+  ordersToday: number;
+  receiptsToday: number;
+  shipmentsToday: number;
+};
 
 export default function DashboardPage() {
   // Lấy cảnh báo tồn thấp
@@ -18,27 +38,60 @@ export default function DashboardPage() {
     },
   });
 
-  // Đếm shipment cần xử lý
-  const { data: pendingShipments } = useQuery({
-    queryKey: ["shipments", "PENDING"],
+  // Lấy stats tổng quan
+  const { data: stats } = useQuery<DashboardStats>({
+    queryKey: ["dashboard-stats"],
     queryFn: async () => {
-      const { data } = await api.get("/shipments?status=PENDING&pageSize=1");
+      const { data } = await api.get("/orders/dashboard-stats");
       return data;
     },
+    refetchInterval: 30_000,
   });
 
-  // Đếm phiếu nhập hôm nay
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const { data: todayReceipts } = useQuery({
-    queryKey: ["receipts", "today"],
-    queryFn: async () => {
-      const { data } = await api.get(
-        `/receipts?fromDate=${today.toISOString()}&pageSize=1`,
-      );
-      return data;
+  const kpis = [
+    {
+      label: "Tổng SKU",
+      value: stats?.totalSkus ?? 0,
+      icon: Layers,
+      color: "bg-blue-500",
+      href: "/stock",
     },
-  });
+    {
+      label: "Tồn kho",
+      value: stats?.totalInventory ?? 0,
+      icon: TrendingUp,
+      color: "bg-purple-500",
+      href: "/stock",
+    },
+    {
+      label: "Đơn offline hôm nay",
+      value: stats?.ordersToday ?? 0,
+      icon: ShoppingCart,
+      color: "bg-amber-500",
+      href: "/orders/create",
+    },
+    {
+      label: "Phiếu xuất chờ",
+      value: stats?.pendingShipments ?? 0,
+      icon: PackageMinus,
+      color: "bg-orange-500",
+      href: "/ship",
+    },
+    {
+      label: "Phiếu nhập hôm nay",
+      value: stats?.receiptsToday ?? 0,
+      icon: FileInput,
+      color: "bg-green-500",
+      href: "/receive",
+    },
+    {
+      label: "Phiếu xuất hôm nay",
+      value: stats?.shipmentsToday ?? 0,
+      icon: Truck,
+      color: "bg-indigo-500",
+      href: "/ship",
+    },
+  ];
 
   const tiles = [
     {
@@ -47,7 +100,6 @@ export default function DashboardPage() {
       desc: "Quét mã / nhập tay / upload file",
       icon: PackageOpen,
       color: "bg-green-500",
-      badge: todayReceipts?.total ? `${todayReceipts.total} phiếu hôm nay` : null,
     },
     {
       href: "/ship",
@@ -55,7 +107,6 @@ export default function DashboardPage() {
       desc: "Pick theo đơn hàng",
       icon: PackageMinus,
       color: "bg-blue-500",
-      badge: pendingShipments?.total ? `${pendingShipments.total} đơn chờ` : null,
     },
     {
       href: "/stock",
@@ -63,7 +114,6 @@ export default function DashboardPage() {
       desc: "Tra cứu tồn thời gian thực",
       icon: TrendingUp,
       color: "bg-purple-500",
-      badge: null,
     },
     {
       href: "/history",
@@ -71,15 +121,43 @@ export default function DashboardPage() {
       desc: "Nhập/xuất/điều chỉnh",
       icon: AlertTriangle,
       color: "bg-gray-700",
-      badge: null,
     },
   ];
 
   return (
     <div className="space-y-4 pb-20">
-      <h1 className="text-2xl font-bold text-gray-900">Tổng quan kho</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-gray-900">Tổng quan kho</h1>
+        <Link
+          href="/orders/create"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary-500 text-white text-sm font-medium hover:bg-primary-600 shadow-sm"
+        >
+          <Plus className="h-4 w-4" />
+          Tạo đơn
+        </Link>
+      </div>
 
-      {/* 4 nút chính - mobile-first grid */}
+      {/* KPI cards - 3 cột x 2 hàng */}
+      <div className="grid grid-cols-3 gap-2">
+        {kpis.map((k) => {
+          const Icon = k.icon;
+          return (
+            <Link key={k.label} href={k.href}>
+              <Card padding="sm" className="hover:shadow-md transition-shadow">
+                <div className={`w-8 h-8 ${k.color} rounded-lg flex items-center justify-center mb-1.5`}>
+                  <Icon className="h-4 w-4 text-white" />
+                </div>
+                <p className="text-xs text-gray-500 leading-tight">{k.label}</p>
+                <p className="text-lg font-bold text-gray-900 mt-0.5">
+                  {formatNumber(k.value)}
+                </p>
+              </Card>
+            </Link>
+          );
+        })}
+      </div>
+
+      {/* 4 nút chính */}
       <div className="grid grid-cols-2 gap-3">
         {tiles.map((tile) => {
           const Icon = tile.icon;
@@ -91,9 +169,6 @@ export default function DashboardPage() {
                 </div>
                 <h3 className="font-semibold text-gray-900">{tile.title}</h3>
                 <p className="text-xs text-gray-500 mt-0.5">{tile.desc}</p>
-                {tile.badge && (
-                  <Badge variant="warning" className="mt-2">{tile.badge}</Badge>
-                )}
               </Card>
             </Link>
           );

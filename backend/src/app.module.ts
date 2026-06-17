@@ -9,6 +9,7 @@ import { StockModule } from './modules/stock/stock.module';
 import { CategoryModule } from './modules/category/category.module';
 import { ReceiptsModule } from './modules/receipts/receipts.module';
 import { ShipmentsModule } from './modules/shipments/shipments.module';
+import { OrdersModule } from './modules/orders/orders.module';
 import { WebhookModule } from './modules/webhook/webhook.module';
 import { SseModule } from './modules/sse/sse.module';
 import { HealthModule } from './modules/health/health.module';
@@ -25,6 +26,7 @@ import { HealthModule } from './modules/health/health.module';
     CategoryModule,
     ReceiptsModule,
     ShipmentsModule,
+    OrdersModule,
     WebhookModule,
     SseModule,
     HealthModule,
