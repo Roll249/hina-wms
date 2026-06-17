@@ -31,68 +31,56 @@ export class WebStockService {
   ) {}
 
   /**
-   * Set số lượng web cho 1 sản phẩm (variant hoặc product).
-   * Tự động chọn Inventory theo variantId (nếu có) hoặc productId.
+   * Set số lượng đẩy lên web (admin).
+   * - webListedQty = số lượng tối đa cho phép bán trên web (admin chỉnh)
+   * - webAvailable = webListedQty - webSoldQty - webReservedQty
+   * Validate: webListedQty <= quantity (tổng tồn kho)
    */
   async setWebStock(dto: SetWebStockDto) {
-    // Xác định target
-    let productId: string | null = null;
-    let variantId: string | null = null;
-
-    if (dto.targetId.startsWith('v-')) {
-      variantId = dto.targetId.slice(2);
-    } else {
-      productId = dto.targetId;
-    }
-
-    // Tìm inventory
-    const where = variantId
-      ? { variantId }
-      : { productId, variantId: null };
-    const inv = await this.prisma.inventory.findFirst({ where });
-    if (!inv) {
-      throw new NotFoundException('Không tìm thấy inventory');
-    }
+    const { inventory, productId, variantId } = await this.findInventory(
+      dto.targetId,
+    );
 
     // Validate: webListedQty <= quantity (tổng tồn)
-    if (dto.webListedQty > inv.quantity) {
+    if (dto.webListedQty > inventory.quantity) {
       throw new BadRequestException(
-        `Số lượng web (${dto.webListedQty}) không được vượt quá tổng tồn kho (${inv.quantity})`,
+        `Số lượng web (${dto.webListedQty}) không được vượt quá tổng tồn kho (${inventory.quantity})`,
       );
     }
 
-    // Validate: webListedQty >= webSoldQty + webReservedQty (không âm)
-    const committed = inv.webSoldQty + inv.webReservedQty;
+    // Validate: webListedQty >= webSoldQty + webReservedQty
+    const committed = inventory.webSoldQty + inventory.webReservedQty;
     if (dto.webListedQty < committed) {
       throw new BadRequestException(
-        `Số lượng web (${dto.webListedQty}) phải >= đã bán + đang reserve (${committed})`,
+        `Số lượng web (${dto.webListedQty}) phải ≥ đã bán + đang reserve (${committed})`,
       );
     }
 
     const updated = await this.prisma.inventory.update({
-      where: { id: inv.id },
+      where: { id: inventory.id },
       data: { webListedQty: dto.webListedQty },
     });
 
-    // Log movement
     await this.prisma.inventoryMovement.create({
       data: {
-        inventoryId: inv.id,
-        productId: inv.productId,
-        variantId: inv.variantId,
+        inventoryId: inventory.id,
+        productId: productId,
+        variantId: variantId,
         type: MovementType.STOCK_SET_MANUAL,
-        quantity: 0, // no quantity change
+        quantity: 0,
         reference: `web_listed_qty=${dto.webListedQty}`,
-        note: `Cập nhật webListedQty: ${inv.webListedQty} → ${dto.webListedQty}`,
+        note: `Set webListedQty: ${inventory.webListedQty} → ${dto.webListedQty}`,
       },
     });
 
     setImmediate(() => {
       this.eventBus.publish('web_stock.changed' as any, {
-        inventoryId: inv.id,
-        productId: inv.productId,
-        variantId: inv.variantId,
+        inventoryId: inventory.id,
+        productId,
+        variantId,
         webListedQty: dto.webListedQty,
+        webAvailableQty:
+          dto.webListedQty - updated.webSoldQty - updated.webReservedQty,
       });
     });
 
@@ -100,8 +88,9 @@ export class WebStockService {
   }
 
   /**
-   * Đồng bộ delta từ web e-comm (khi có đơn tạo/hủy).
+   * Đồng bộ từ web e-comm (khi có đơn tạo/hủy).
    * Tăng/giảm webSoldQty theo delta.
+   * Đồng thời: webAvailable = webListedQty - webSoldQty luôn tự co lại.
    */
   async syncFromWeb(dto: BulkSyncFromWebDto) {
     const results: any[] = [];
@@ -125,14 +114,15 @@ export class WebStockService {
         );
         continue;
       }
-      if (newSold > inv.webListedQty + inv.webReservedQty) {
+      // Không cho webSoldQty vượt tổng tồn
+      if (newSold > inv.quantity) {
         this.logger.warn(
-          `webSoldQty (${newSold}) > listedQty (${inv.webListedQty}) for ${targetId}`,
+          `webSoldQty (${newSold}) > total qty (${inv.quantity}) for ${targetId}`,
         );
         continue;
       }
 
-      await this.prisma.inventory.update({
+      const updated = await this.prisma.inventory.update({
         where: { id: inv.id },
         data: { webSoldQty: newSold },
       });
@@ -142,7 +132,9 @@ export class WebStockService {
         productId: inv.productId,
         variantId: inv.variantId,
         newWebSoldQty: newSold,
-        webAvailableQty: inv.webListedQty - newSold - inv.webReservedQty,
+        webListedQty: updated.webListedQty,
+        webAvailableQty:
+          updated.webListedQty - newSold - updated.webReservedQty,
       });
     }
 
@@ -151,6 +143,26 @@ export class WebStockService {
     });
 
     return { synced: results.length, results };
+  }
+
+  private async findInventory(targetId: string) {
+    let productId: string | null = null;
+    let variantId: string | null = null;
+
+    if (targetId.startsWith('v-')) {
+      variantId = targetId.slice(2);
+    } else {
+      productId = targetId;
+    }
+
+    const where = variantId
+      ? { variantId }
+      : { productId, variantId: null };
+    const inventory = await this.prisma.inventory.findFirst({ where });
+    if (!inventory) {
+      throw new NotFoundException('Không tìm thấy inventory');
+    }
+    return { inventory, productId: inventory.productId, variantId: inventory.variantId };
   }
 
   /**

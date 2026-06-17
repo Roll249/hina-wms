@@ -57,16 +57,23 @@ export function WebStockModal({
     enabled: !!productId && open,
   });
 
-  // Reset edits khi data load
+  // Reset edits khi data load: default = quantity (cho phép bán toàn bộ tồn)
   useEffect(() => {
     if (data) {
       const initial: Record<string, number> = {};
       if (data.product.inventory) {
-        initial[data.product.id] = data.product.inventory.webListedQty;
+        // Nếu chưa từng set webListedQty (== 0) thì default = quantity
+        initial[data.product.id] =
+          data.product.inventory.webListedQty > 0
+            ? data.product.inventory.webListedQty
+            : data.product.inventory.quantity;
       }
       data.variants.forEach((v) => {
         if (v.inventory) {
-          initial[v.id] = v.inventory.webListedQty;
+          initial[v.id] =
+            v.inventory.webListedQty > 0
+              ? v.inventory.webListedQty
+              : v.inventory.quantity;
         }
       });
       setEdits(initial);
@@ -122,9 +129,10 @@ export function WebStockModal({
             <>
               <Card padding="sm" className="bg-blue-50/50 border-blue-200">
                 <p className="text-xs text-blue-700">
-                  💡 <b>Số lượng web</b> là mức tối đa khách có thể mua trên web.
-                  Kho nhập vào {data.product.inventory ? formatNumber(data.product.inventory.quantity) : 0} sản phẩm,
-                  bạn có thể cho phép bán 1 phần lên web (vd: 50/100) hoặc toàn bộ.
+                  💡 <b>Số lượng cho web</b> = mức tối đa khách có thể mua trên web.
+                  Kho có <b>{data.product.inventory ? formatNumber(data.product.inventory.quantity) : 0}</b> sản phẩm,
+                  web đã bán <b className="text-blue-600">{formatNumber(data.product.inventory?.webSoldQty || 0)}</b>,
+                  còn web mua được <b className="text-green-600">{formatNumber((data.product.inventory?.webListedQty || data.product.inventory?.quantity || 0) - (data.product.inventory?.webSoldQty || 0) - (data.product.inventory?.webReservedQty || 0))}</b>.
                 </p>
               </Card>
 
