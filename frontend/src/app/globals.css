@@ -54,8 +54,8 @@
    CSS Variables — Đồng bộ với web e-comm
    ============================================ */
 :root {
-  /* Primary — Coral #FB7185 */
-  --color-primary: #fb7185;
+  /* Primary — Amber #f59e0b */
+  --color-primary: #f59e0b;
   --color-primary-foreground: #ffffff;
 
   /* Secondary */
