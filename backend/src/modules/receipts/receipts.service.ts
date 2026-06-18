@@ -130,7 +130,7 @@ export class ReceiptsService {
       throw new BadRequestException('Không tìm thấy category nào trong hệ thống');
     }
 
-    // Tạo sản phẩm mới
+    // Tạo sản phẩm mới (đã được phân loại)
     const product = await this.prisma.product.create({
       data: {
         id: crypto.randomUUID(),
@@ -142,6 +142,7 @@ export class ReceiptsService {
         basePrice: 0,
         visibility: 'WHOLESALE',
         trackInventory: true,
+        isClassified: true, // Đánh dấu là đã phân loại để hiện trong order search
       },
     });
 

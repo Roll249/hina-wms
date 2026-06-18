@@ -386,7 +386,7 @@ export class OrdersService {
 
     const products = await this.prisma.product.findMany({
       where: {
-        isClassified: true,
+        // Bỏ yêu cầu isClassified - cho phép tìm cả sản phẩm chưa phân loại
         deletedAt: null,
         OR: [
           { productCode: { contains: query, mode: 'insensitive' } },
@@ -403,7 +403,7 @@ export class OrdersService {
         inventory: { select: { quantity: true, reservedQty: true } },
         images: { take: 1, where: { isPrimary: true } },
       },
-      orderBy: { name: 'asc' },
+      orderBy: { isClassified: 'desc' }, // Ưu tiên sản phẩm đã phân loại
     });
 
     return products.map((p) => ({
