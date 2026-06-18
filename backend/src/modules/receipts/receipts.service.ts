@@ -27,6 +27,150 @@ export class ReceiptsService {
   ) {}
 
   /**
+   * Scan barcode - kiểm tra sản phẩm tồn tại chưa
+   * Trả về: exists=true nếu sản phẩm đã có → suggest cộng dồn
+   * Trả về: exists=false nếu sản phẩm mới → suggest tạo mới
+   */
+  async scanBarcode(code: string) {
+    const trimmed = code.trim().toUpperCase();
+    if (!trimmed) {
+      return { exists: false, action: 'create-new' as const, suggestedCode: '' };
+    }
+
+    // Ưu tiên variant
+    const variant = await this.prisma.productVariant.findFirst({
+      where: {
+        OR: [{ productCode: trimmed }, { sku: trimmed }],
+        product: { deletedAt: null },
+      },
+      include: {
+        product: { include: { images: { take: 1, where: { isPrimary: true } } } },
+        inventory: true,
+      },
+    });
+
+    if (variant) {
+      return {
+        exists: true,
+        action: 'add-quantity' as const,
+        product: {
+          id: variant.productId,
+          productCode: variant.productCode ?? variant.sku,
+          sku: variant.sku,
+          name: variant.product.name + (variant.name ? ` - ${variant.name}` : ''),
+          variantId: variant.id,
+          variantName: variant.name ?? undefined,
+          quantity: variant.inventory?.quantity ?? 0,
+          imageUrl: variant.product.images[0]?.url,
+        },
+        suggestedCode: variant.productCode ?? variant.sku,
+      };
+    }
+
+    // Product cha
+    const product = await this.prisma.product.findFirst({
+      where: {
+        OR: [{ productCode: trimmed }, { sku: trimmed }, { supplierCode: trimmed }],
+        deletedAt: null,
+      },
+      include: { images: { take: 1, where: { isPrimary: true } }, inventory: true },
+    });
+
+    if (product) {
+      return {
+        exists: true,
+        action: 'add-quantity' as const,
+        product: {
+          id: product.id,
+          productCode: product.productCode,
+          sku: product.sku,
+          name: product.name,
+          variantId: null,
+          quantity: product.inventory?.quantity ?? 0,
+          imageUrl: product.images[0]?.url,
+        },
+        suggestedCode: product.productCode,
+      };
+    }
+
+    // Không tìm thấy → gợi ý tạo mới
+    return {
+      exists: false,
+      action: 'create-new' as const,
+      suggestedCode: trimmed,
+    };
+  }
+
+  /**
+   * Tạo nhanh sản phẩm mới từ barcode scan
+   * Auto-assign category "Uncategorized" nếu có
+   */
+  async createQuickProduct(userId: string, productCode: string, name?: string) {
+    const trimmed = productCode.trim().toUpperCase();
+
+    // Kiểm tra đã tồn tại chưa
+    const existing = await this.prisma.product.findFirst({
+      where: {
+        OR: [{ productCode: trimmed }, { sku: trimmed }],
+        deletedAt: null,
+      },
+    });
+    if (existing) {
+      throw new BadRequestException(`Sản phẩm với mã "${trimmed}" đã tồn tại`);
+    }
+
+    // Tìm category "Uncategorized" hoặc tạo mới
+    let category = await this.prisma.category.findFirst({
+      where: { name: { equals: 'Uncategorized', mode: 'insensitive' } },
+    });
+    if (!category) {
+      category = await this.prisma.category.findFirst({ where: {} }); // Lấy category đầu tiên
+    }
+    if (!category) {
+      throw new BadRequestException('Không tìm thấy category nào trong hệ thống');
+    }
+
+    // Tạo sản phẩm mới
+    const product = await this.prisma.product.create({
+      data: {
+        id: crypto.randomUUID(),
+        sku: trimmed,
+        productCode: trimmed,
+        slug: `${trimmed.toLowerCase()}-${Date.now()}`,
+        name: name?.trim() || `Sản phẩm ${trimmed}`,
+        categoryId: category.id,
+        basePrice: 0,
+        visibility: 'WHOLESALE',
+        trackInventory: true,
+      },
+    });
+
+    // Tạo inventory record
+    await this.prisma.inventory.create({
+      data: {
+        productId: product.id,
+        quantity: 0,
+        reservedQty: 0,
+        webListedQty: 0,
+        webSoldQty: 0,
+        webReservedQty: 0,
+        lowStockThreshold: 0,
+      },
+    });
+
+    this.logger.log(`Quick product created: ${product.productCode} by user ${userId}`);
+
+    return {
+      id: product.id,
+      productCode: product.productCode,
+      sku: product.sku,
+      name: product.name,
+      categoryId: product.categoryId,
+      quantity: 0,
+    };
+  }
+
+  /**
    * Tạo phiếu nhập mới (DRAFT)
    */
   async createReceipt(userId: string, dto: CreateReceiptDto) {

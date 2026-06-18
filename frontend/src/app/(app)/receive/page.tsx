@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Camera, Keyboard, FileUp, Check, Trash2, Plus } from "lucide-react";
+import { Camera, Keyboard, FileUp, Check, Trash2, Plus, Search, Package } from "lucide-react";
 import Papa from "papaparse";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
@@ -10,8 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { BarcodeScanner } from "@/components/scanner/barcode-scanner";
+import { useScanBarcode, useCreateQuickProduct, ScanResult } from "@/hooks/use-receipt";
 import { useProductLookup } from "@/hooks/use-stock";
-import { ScanResult } from "@/hooks/use-scanner";
 import api from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
 import { cn } from "@/lib/utils";
@@ -21,21 +21,36 @@ type Tab = "scan" | "manual" | "file";
 interface ReceiptItem {
   productCode: string;
   productName?: string;
+  productId?: string;
   receivedQuantity: number;
   unitCost?: number;
+  isNewProduct?: boolean;
 }
 
 export default function ReceivePage() {
   const [tab, setTab] = useState<Tab>("scan");
   const [receiptId, setReceiptId] = useState<string | null>(null);
   const [items, setItems] = useState<ReceiptItem[]>([]);
+
+  // Scan state
   const [scannedCode, setScannedCode] = useState<string | null>(null);
   const [scanQty, setScanQty] = useState(1);
+  const [scanResult, setScanResult] = useState<ScanResult | null>(null);
+  const [showNewProductForm, setShowNewProductForm] = useState(false);
+  const [newProductName, setNewProductName] = useState("");
+
+  // Manual search state
+  const [searchQuery, setSearchQuery] = useState("");
   const [manualCode, setManualCode] = useState("");
   const [manualQty, setManualQty] = useState(1);
+
   const qc = useQueryClient();
 
-  const { data: scannedProduct } = useProductLookup(scannedCode);
+  // Scan barcode query
+  const { data: barcodeScan, isLoading: scanning } = useScanBarcode(scannedCode);
+
+  // Create quick product mutation
+  const createQuickProduct = useCreateQuickProduct();
 
   // Tạo phiếu nhập (lazy - tạo khi cần)
   const createReceipt = useMutation({
@@ -72,10 +87,7 @@ export default function ReceivePage() {
     onSuccess: (_data, variables) => {
       setItems((prev) => [...prev, variables]);
       toast.success(`Đã thêm: ${variables.productCode} x${variables.receivedQuantity}`);
-      setScannedCode(null);
-      setScanQty(1);
-      setManualCode("");
-      setManualQty(1);
+      resetScanState();
     },
     onError: (err: any) => {
       toast.error(err.response?.data?.message || "Thêm thất bại");
@@ -101,26 +113,84 @@ export default function ReceivePage() {
     },
   });
 
-  const handleScan = useCallback((result: ScanResult) => {
+  // Handle scan result
+  const handleScan = useCallback((result: { text: string }) => {
     setScannedCode(result.text);
     setScanQty(1);
+    setScanResult(null);
+    setShowNewProductForm(false);
+    setNewProductName("");
   }, []);
 
-  const handleAddScanned = () => {
+  // When scan returns, update state
+  useState(() => {
+    if (barcodeScan) {
+      setScanResult(barcodeScan);
+      if (!barcodeScan.exists) {
+        setShowNewProductForm(true);
+        setNewProductName("");
+      }
+    }
+  });
+
+  // Create new product and add to receipt
+  const handleCreateAndAdd = async () => {
     if (!scannedCode) return;
+    try {
+      const newProduct = await createQuickProduct.mutateAsync({
+        productCode: scannedCode,
+        name: newProductName || undefined,
+      });
+      toast.success(`Đã tạo sản phẩm mới: ${newProduct.productCode}`);
+      // Add to receipt
+      addItem.mutate({
+        productCode: newProduct.productCode,
+        productId: newProduct.id,
+        productName: newProduct.name,
+        receivedQuantity: scanQty,
+        isNewProduct: true,
+      });
+      setShowNewProductForm(false);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Tạo sản phẩm thất bại");
+    }
+  };
+
+  // Add existing product from scan
+  const handleAddScanned = () => {
+    if (!scannedCode || !scanResult?.exists) return;
+    const code = scanResult.suggestedCode || scannedCode;
     addItem.mutate({
-      productCode: scannedCode,
-      productName: scannedProduct?.name,
+      productCode: code,
+      productName: scanResult.product?.name,
       receivedQuantity: scanQty,
     });
   };
 
+  // Search product by code/SKU (for manual tab)
+  const handleSearchAndAdd = () => {
+    if (!searchQuery.trim()) return;
+    setManualCode(searchQuery.trim().toUpperCase());
+  };
+
+  const resetScanState = () => {
+    setScannedCode(null);
+    setScanQty(1);
+    setScanResult(null);
+    setShowNewProductForm(false);
+    setNewProductName("");
+  };
+
+  // Manual add
   const handleAddManual = () => {
     if (!manualCode) return;
     addItem.mutate({
       productCode: manualCode,
       receivedQuantity: manualQty,
     });
+    setManualCode("");
+    setManualQty(1);
+    setSearchQuery("");
   };
 
   const removeItem = (idx: number) => {
@@ -172,12 +242,17 @@ export default function ReceivePage() {
     });
   };
 
+  const totalQty = items.reduce((sum, item) => sum + item.receivedQuantity, 0);
+
   return (
     <div className="space-y-4 pb-20">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Nhập kho</h1>
         {items.length > 0 && (
-          <Badge variant="info">{items.length} sản phẩm</Badge>
+          <div className="flex gap-2">
+            <Badge variant="info">{items.length} sản phẩm</Badge>
+            <Badge variant="success">{totalQty} cái</Badge>
+          </div>
         )}
       </div>
 
@@ -185,7 +260,7 @@ export default function ReceivePage() {
       <div className="flex gap-1 p-1 bg-gray-100 rounded-lg">
         {[
           { key: "scan", label: "Quét mã", icon: Camera },
-          { key: "manual", label: "Nhập tay", icon: Keyboard },
+          { key: "manual", label: "Tìm & thêm", icon: Search },
           { key: "file", label: "Upload file", icon: FileUp },
         ].map((t) => {
           const Icon = t.icon;
@@ -205,28 +280,31 @@ export default function ReceivePage() {
         })}
       </div>
 
-      {/* Tab content */}
+      {/* ======= SCAN TAB ======= */}
       {tab === "scan" && (
         <Card padding="md" className="space-y-4">
           <BarcodeScanner onScan={handleScan} />
 
           {scannedCode && (
-            <div className="border-t pt-4">
-              {scannedProduct ? (
+            <div className="border-t pt-4 space-y-3">
+              {/* Đang quét */}
+              {scanning && (
+                <div className="text-center py-4">
+                  <div className="animate-pulse text-gray-500">Đang kiểm tra: {scannedCode}...</div>
+                </div>
+              )}
+
+              {/* Sản phẩm đã tồn tại */}
+              {scanResult?.exists && scanResult.product && !scanning && (
                 <div className="space-y-3">
-                  <div className="flex gap-3">
-                    {scannedProduct.imageUrl && (
-                      <img
-                        src={scannedProduct.imageUrl}
-                        alt=""
-                        className="w-20 h-20 object-cover rounded-lg"
-                      />
-                    )}
+                  <div className="flex gap-3 bg-green-50 p-3 rounded-lg border border-green-200">
+                    <Check className="h-5 w-5 text-green-600 mt-1 shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <p className="font-mono text-xs text-gray-500">{scannedProduct.productCode}</p>
-                      <p className="font-medium text-gray-900 line-clamp-2">{scannedProduct.name}</p>
+                      <p className="text-xs text-green-600 font-medium">Sản phẩm đã có trong kho</p>
+                      <p className="font-mono text-xs text-gray-500">{scanResult.suggestedCode}</p>
+                      <p className="font-medium text-gray-900">{scanResult.product.name}</p>
                       <p className="text-sm text-gray-500">
-                        Tồn hiện tại: <span className="font-semibold">{formatNumber(scannedProduct.quantity)}</span>
+                        Tồn hiện tại: <span className="font-semibold">{formatNumber(scanResult.product.quantity)}</span>
                       </p>
                     </div>
                   </div>
@@ -259,13 +337,64 @@ export default function ReceivePage() {
                       disabled={addItem.isPending}
                       className="ml-auto"
                     >
-                      <Plus className="h-4 w-4" /> Thêm
+                      <Plus className="h-4 w-4" /> Cộng dồn
                     </Button>
                   </div>
                 </div>
-              ) : (
-                <div className="text-center py-4">
-                  <p className="text-sm text-red-600">Không tìm thấy: {scannedCode}</p>
+              )}
+
+              {/* Sản phẩm mới - hiện form tạo */}
+              {scanResult && !scanResult.exists && !scanning && (
+                <div className="space-y-3">
+                  <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                    <div className="flex gap-3">
+                      <Package className="h-5 w-5 text-blue-600 mt-1 shrink-0" />
+                      <div className="flex-1">
+                        <p className="text-xs text-blue-600 font-medium">Sản phẩm mới - chưa có trong kho</p>
+                        <p className="font-mono text-lg font-bold text-gray-900">{scanResult.suggestedCode}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {showNewProductForm && (
+                    <div className="space-y-3 bg-gray-50 p-3 rounded-lg">
+                      <Input
+                        label="Tên sản phẩm (tùy chọn)"
+                        placeholder="VD: Áo thun nam size L"
+                        value={newProductName}
+                        onChange={(e) => setNewProductName(e.target.value)}
+                      />
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          min={1}
+                          value={scanQty}
+                          onChange={(e) => setScanQty(Math.max(1, Number(e.target.value)))}
+                          className="w-24 text-center"
+                          label="Số lượng"
+                        />
+                        <Button
+                          variant="primary"
+                          onClick={handleCreateAndAdd}
+                          disabled={createQuickProduct.isPending || addItem.isPending}
+                          className="flex-1"
+                        >
+                          <Plus className="h-4 w-4" />
+                          Tạo & thêm {scanQty} cái
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {!showNewProductForm && (
+                    <Button
+                      variant="secondary"
+                      onClick={() => setShowNewProductForm(true)}
+                      className="w-full"
+                    >
+                      <Plus className="h-4 w-4" /> Tạo sản phẩm mới & thêm vào kho
+                    </Button>
+                  )}
                 </div>
               )}
             </div>
@@ -273,34 +402,59 @@ export default function ReceivePage() {
         </Card>
       )}
 
+      {/* ======= MANUAL/SEARCH TAB ======= */}
       {tab === "manual" && (
-        <Card padding="md" className="space-y-3">
-          <Input
-            label="Mã sản phẩm / SKU"
-            placeholder="Nhập mã hoặc scan"
-            value={manualCode}
-            onChange={(e) => setManualCode(e.target.value.toUpperCase())}
-            autoFocus
-          />
-          <Input
-            label="Số lượng"
-            type="number"
-            min={1}
-            value={manualQty}
-            onChange={(e) => setManualQty(Math.max(1, Number(e.target.value)))}
-          />
-          <Button
-            variant="primary"
-            size="lg"
-            onClick={handleAddManual}
-            disabled={!manualCode || addItem.isPending}
-            className="w-full"
-          >
-            <Plus className="h-4 w-4" /> Thêm vào phiếu
-          </Button>
+        <Card padding="md" className="space-y-4">
+          <div className="space-y-3">
+            <Input
+              label="Tìm theo mã hàng / SKU"
+              placeholder="Nhập mã hoặc tên sản phẩm..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSearchAndAdd()}
+              autoFocus
+            />
+            <Button
+              variant="primary"
+              onClick={handleSearchAndAdd}
+              className="w-full"
+            >
+              <Search className="h-4 w-4" /> Tìm kiếm
+            </Button>
+          </div>
+
+          {manualCode && (
+            <div className="border-t pt-4 space-y-3">
+              <Input
+                label="Mã sản phẩm"
+                value={manualCode}
+                disabled
+                className="font-mono"
+              />
+              <div className="flex gap-3">
+                <Input
+                  label="Số lượng"
+                  type="number"
+                  min={1}
+                  value={manualQty}
+                  onChange={(e) => setManualQty(Math.max(1, Number(e.target.value)))}
+                />
+              </div>
+              <Button
+                variant="primary"
+                size="lg"
+                onClick={handleAddManual}
+                disabled={!manualCode || addItem.isPending}
+                className="w-full"
+              >
+                <Plus className="h-4 w-4" /> Thêm vào phiếu
+              </Button>
+            </div>
+          )}
         </Card>
       )}
 
+      {/* ======= FILE TAB ======= */}
       {tab === "file" && (
         <Card padding="md" className="space-y-3">
           <p className="text-sm text-gray-600">
@@ -350,7 +504,12 @@ export default function ReceivePage() {
                 className="flex items-center gap-2 py-2 border-b border-gray-100 last:border-0"
               >
                 <div className="flex-1 min-w-0">
-                  <p className="font-mono text-xs text-gray-500">{item.productCode}</p>
+                  <div className="flex gap-2 items-center">
+                    <p className="font-mono text-xs text-gray-500">{item.productCode}</p>
+                    {item.isNewProduct && (
+                      <Badge variant="info" className="text-xs">Mới</Badge>
+                    )}
+                  </div>
                   {item.productName && (
                     <p className="text-sm text-gray-700 truncate">{item.productName}</p>
                   )}

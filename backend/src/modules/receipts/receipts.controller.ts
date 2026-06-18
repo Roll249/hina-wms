@@ -13,6 +13,7 @@ import {
   CreateReceiptDto,
   AddReceiptItemDto,
   ImportReceiptsDto,
+  ScanBarcodeResultDto,
 } from './receipts.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/auth.decorators';
@@ -23,6 +24,27 @@ import { GoodsReceiptStatus } from '@prisma/client';
 @Roles('ADMIN', 'MANAGE')
 export class ReceiptsController {
   constructor(private readonly receipts: ReceiptsService) {}
+
+  /**
+   * Scan barcode - kiểm tra sản phẩm tồn tại chưa
+   * Trả về: exists=true nếu sản phẩm đã có → suggest cộng dồn
+   * Trả về: exists=false nếu sản phẩm mới → suggest tạo mới
+   */
+  @Get('scan/:code')
+  scanBarcode(@Param('code') code: string) {
+    return this.receipts.scanBarcode(code);
+  }
+
+  /**
+   * Tạo sản phẩm mới từ barcode scan (khi sản phẩm chưa tồn tại)
+   */
+  @Post('quick-product')
+  createQuickProduct(
+    @CurrentUser() user: JwtPayload,
+    @Body() body: { productCode: string; name?: string },
+  ) {
+    return this.receipts.createQuickProduct(user.sub, body.productCode, body.name);
+  }
 
   /**
    * Tạo phiếu nhập mới

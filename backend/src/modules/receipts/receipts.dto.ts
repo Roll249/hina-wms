@@ -84,6 +84,22 @@ export class ImportReceiptsDto {
   items!: BulkReceiptItemDto[];
 }
 
+export class ScanBarcodeResultDto {
+  exists!: boolean;
+  product?: {
+    id: string;
+    productCode: string;
+    sku: string;
+    name: string;
+    variantId: string | null;
+    variantName?: string;
+    quantity: number;
+    imageUrl?: string;
+  };
+  action!: 'add-quantity' | 'create-new';
+  suggestedCode?: string;
+}
+
 export class ConfirmReceiptDto {
   @IsString()
   receiptId!: string;
