@@ -1,0 +1,66 @@
+# ============================================================
+# Hina WMS - Standalone Docker Compose
+# Chạy độc lập, kết nối với hina-e-comm qua shared network
+# ============================================================
+# Usage:
+#   1. Tạo network chung: docker network create hina-network
+#   2. Apply migration: psql $DATABASE_URL -f backend/prisma/migrations/20260616100000_wms_init/migration.sql
+#   3. Chạy: docker-compose up -d
+# ============================================================
+
+version: "3.9"
+
+networks:
+  hina-network:
+    name: hina-network
+    external: true
+
+services:
+  # ============== WMS Backend ==============
+  hina-wms-backend:
+    image: roll249/hina-wms-backend:latest
+    container_name: hina-wms-backend
+    ports:
+      - "7777:7777"
+    environment:
+      NODE_ENV: production
+      PORT: 7777
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN: 7d
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET}
+      MINIO_BUCKET: ${MINIO_BUCKET}
+      MINIO_PUBLIC_ENDPOINT: ${MINIO_PUBLIC_ENDPOINT}
+      MINIO_INTERNAL_ENDPOINT: ${MINIO_INTERNAL_ENDPOINT}
+      MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_REGION: ${MINIO_REGION}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+    networks:
+      - hina-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:7777/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ============== WMS Frontend ==============
+  hina-wms-frontend:
+    image: roll249/hina-wms-frontend:latest
+    container_name: hina-wms-frontend
+    ports:
+      - "4568:4568"
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    depends_on:
+      - hina-wms-backend
+    networks:
+      - hina-network
+    restart: unless-stopped
