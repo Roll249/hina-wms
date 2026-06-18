@@ -11,6 +11,8 @@ export type WmsEventType =
   | 'stock.low'
   | 'order.confirmed'
   | 'order.cancelled'
+  | 'order.paid'
+  | 'order.item_sold'
   | 'shipment.created'
   | 'shipment.handed_over';
 

@@ -217,9 +217,29 @@ export class ShipmentsService {
       where: { id: dto.shipmentId },
     });
     if (!shipment) throw new NotFoundException('Không tìm thấy phiếu xuất');
+    if (shipment.status === ShipmentStatus.HANDED_OVER) {
+      throw new BadRequestException('Phiếu đã bàn giao rồi');
+    }
+    if (shipment.status === ShipmentStatus.CANCELLED) {
+      throw new BadRequestException('Phiếu đã bị hủy, không thể bàn giao');
+    }
     if (shipment.status !== ShipmentStatus.PICKED && shipment.status !== ShipmentStatus.PACKED) {
       throw new BadRequestException(
         `Cần hoàn tất pick/đóng gói trước khi bàn giao. Hiện tại: ${shipment.status}`,
+      );
+    }
+
+    // CRITICAL: Check if order was cancelled BEFORE updating shipment
+    const order = await this.prisma.order.findUnique({
+      where: { id: shipment.orderId },
+      select: { id: true, status: true, orderNumber: true },
+    });
+    if (!order) {
+      throw new NotFoundException('Không tìm thấy đơn hàng liên quan');
+    }
+    if (order.status === OrderStatus.CANCELLED || order.status === OrderStatus.REFUNDED) {
+      throw new BadRequestException(
+        `Đơn hàng ${order.orderNumber} đã bị hủy (${order.status}). Không thể bàn giao phiếu xuất.`,
       );
     }
 

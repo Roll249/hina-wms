@@ -47,6 +47,12 @@ enum OrderStatus {
   REFUNDED
 }
 
+enum OrderSource {
+  WEB
+  WMS
+  ADMIN_WEB
+}
+
 enum PaymentMethod {
   COD
   BANK_TRANSFER
@@ -477,6 +483,12 @@ model Order {
 
   // Guest order flag (orders placed without registration)
   isGuestOrder    Boolean         @default(false)
+
+  // Order source: WEB (customer ecom) | WMS (warehouse offline) | ADMIN_WEB (admin on ecom)
+  source          OrderSource     @default(WEB)
+
+  // Hide from ecom customer-facing pages (true for WMS orders)
+  isHiddenFromWeb Boolean         @default(false)
 
   // Status
   status          OrderStatus    @default(PENDING)

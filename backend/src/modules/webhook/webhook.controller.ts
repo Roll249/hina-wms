@@ -6,6 +6,7 @@ import {
   UnauthorizedException,
   Logger,
   BadRequestException,
+  OnModuleInit,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHmac, timingSafeEqual } from 'crypto';
@@ -27,7 +28,7 @@ interface HinaWebhookPayload {
  * Xác thực bằng HMAC-SHA256 với shared secret.
  */
 @Controller('webhook')
-export class WebhookController {
+export class WebhookController implements OnModuleInit {
   private readonly logger = new Logger(WebhookController.name);
 
   constructor(
@@ -36,6 +37,19 @@ export class WebhookController {
     private readonly shipments: ShipmentsService,
     private readonly webStock: WebStockService,
   ) {}
+
+  onModuleInit() {
+    // Subscribe Redis events từ hina-e-comm (primary channel)
+    this.eventBus.onEvent(async (event) => {
+      if (event.type === 'order.confirmed' || event.type === 'order.paid') {
+        await this.handleOrderConfirmed(event.data);
+      } else if (event.type === 'order.cancelled') {
+        await this.handleOrderCancelled(event.data);
+      } else if (event.type === 'order.item_sold') {
+        await this.handleOrderItemSold(event.data);
+      }
+    });
+  }
 
   @Public()
   @Post('hina')

@@ -80,7 +80,7 @@ export default function CreateOrderPage() {
     const timer = setTimeout(async () => {
       setSearching(true);
       try {
-        const { data } = await api.get(`/orders/search-products?q=${encodeURIComponent(query)}`);
+        const { data } = await api.get(`/admin/orders/search-products?q=${encodeURIComponent(query)}`);
         setResults(data);
       } catch (err) {
         toast.error("Lỗi tìm sản phẩm");
@@ -168,7 +168,7 @@ export default function CreateOrderPage() {
 
     setSubmitting(true);
     try {
-      const { data } = await api.post("/orders/wms", {
+      const { data } = await api.post("/admin/orders", {
         customerName: customerName.trim(),
         customerPhone: customerPhone.trim(),
         shippingAddress: customerAddress.trim(),
@@ -181,7 +181,7 @@ export default function CreateOrderPage() {
       });
 
       toast.success(`Đã tạo đơn ${data.orderNumber}`);
-      router.push("/ship");
+      router.push(`/orders/${data.id}`);
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Lỗi tạo đơn hàng");
     } finally {

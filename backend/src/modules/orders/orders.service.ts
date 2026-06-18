@@ -2,13 +2,18 @@ import { Injectable, NotFoundException, BadRequestException, Logger } from '@nes
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { EventBusService } from '../../common/events/event-bus.service';
 import { CreateOrderDto } from './orders.dto';
-import { OrderStatus, PaymentMethod, OrderStatus as PrismaOrderStatus } from '@prisma/client';
+import { OrderStatus, PaymentMethod, OrderSource } from '@prisma/client';
+import { WmsCustomersService } from '../customers/wms-customers.service';
 
 /**
  * Quản lý đơn hàng tạo thủ công từ WMS (kho).
  * - Dùng khi khách mua offline hoặc đặt qua điện thoại.
- * - Đơn lưu vào bảng Order chung, đánh dấu isGuestOrder=true.
+ * - Đơn lưu vào bảng Order chung, đánh dấu:
+ *     - source = 'WMS'
+ *     - isHiddenFromWeb = true (ecom customer/admin pages sẽ ẩn đơn này)
+ *     - isGuestOrder = true (cho legacy code)
  * - Tự động tạo OutboundShipment PENDING để kho pick.
+ * - Manual customer reuse theo SĐT (WmsCustomersService.createOrFindByPhone).
  */
 @Injectable()
 export class OrdersService {
@@ -17,18 +22,26 @@ export class OrdersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventBus: EventBusService,
+    private readonly customers: WmsCustomersService,
   ) {}
 
   /**
    * Tạo đơn hàng từ WMS (khách offline / đặt qua điện thoại).
    * Flow:
-   *  1. Validate sản phẩm tồn tại + còn tồn kho
-   *  2. Tạo Order với snapshot giá/tên
-   *  3. Tự động tạo OutboundShipment PENDING để warehouse pick
+   *  1. Tìm hoặc tạo manual customer theo SĐT (idempotent - cùng SĐT → cùng customer)
+   *  2. Validate sản phẩm tồn tại + còn tồn kho
+   *  3. Tạo Order với snapshot giá/tên, source=WMS, isHiddenFromWeb=true
+   *  4. Tự động tạo OutboundShipment PENDING để warehouse pick
+   *  5. Log OrderStatusHistory + AuditLog
    */
   async createOrderFromWms(userId: string, dto: CreateOrderDto) {
-    // Lấy system user (GUEST) để gán customer - vì đơn WMS không có userId thật
-    const guestUser = await this.getOrCreateGuestUser();
+    // 1. Tìm hoặc tạo manual customer theo SĐT
+    const customer = await this.customers.createOrFindByPhone(
+      userId,
+      dto.customerName,
+      dto.customerPhone,
+      dto.shippingAddress,
+    );
     const warehouseId = await this.getDefaultWarehouseId();
 
     // Validate sản phẩm + snapshot giá
@@ -97,12 +110,16 @@ export class OrdersService {
       const newOrder = await tx.order.create({
         data: {
           orderNumber,
-          customerId: guestUser.id,
+          customerId: customer.userId,
+          wholesaleCustomerId: customer.wholesaleCustomerId,
           isGuestOrder: true,
+          source: OrderSource.WMS,
+          isHiddenFromWeb: true,
           shippingAddress: {
             name: dto.customerName,
             phone: dto.customerPhone,
             address: dto.shippingAddress,
+            addressId: customer.deliveryAddressId,
           } as any,
           subtotal,
           total,
@@ -180,10 +197,184 @@ export class OrdersService {
         orderId: order.id,
         orderNumber: order.orderNumber,
         source: 'WMS',
+        customerIsNew: customer.isNew,
       }, warehouseId);
     });
 
+    this.logger.log(
+      `Created WMS order ${orderNumber} for ${dto.customerName} (${dto.customerPhone}), customer.isNew=${customer.isNew}`,
+    );
+
     return order;
+  }
+
+  /**
+   * Lấy chi tiết 1 order (cho WMS admin).
+   * Trả về order + items + status history + shipment.
+   */
+  async getOrderById(orderId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        items: { orderBy: { createdAt: 'asc' } },
+        statusHistory: { orderBy: { createdAt: 'desc' } },
+        customer: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            role: true,
+            isActive: true,
+          },
+        },
+        wholesaleCustomer: {
+          select: {
+            id: true,
+            businessName: true,
+            ico: true,
+            dic: true,
+            taxId: true,
+          },
+        },
+      },
+    });
+    if (!order) throw new NotFoundException('Không tìm thấy đơn hàng');
+
+    // Query shipment riêng (OutboundShipment không có relation ngược về Order)
+    const shipment = await this.prisma.outboundShipment.findFirst({
+      where: { orderId: order.id },
+      include: { items: true, warehouse: true, pickedBy: { include: { user: true } } },
+    });
+
+    return this.serializeOrder({ ...order, shipment });
+  }
+
+  /**
+   * List orders với filter (cho WMS admin/orders page).
+   * - Mặc định hiển thị tất cả (cả WEB + WMS)
+   * - Filter: source, status, fromDate, toDate, search
+   */
+  async listOrders(filter: {
+    source?: 'WEB' | 'WMS' | 'ADMIN_WEB';
+    status?: string;
+    search?: string;
+    fromDate?: string;
+    toDate?: string;
+    page?: number;
+    pageSize?: number;
+  }) {
+    const page = Math.max(1, filter.page ?? 1);
+    const pageSize = Math.min(100, Math.max(1, filter.pageSize ?? 20));
+    const skip = (page - 1) * pageSize;
+
+    const where: any = {};
+    if (filter.source) where.source = filter.source;
+    if (filter.status) where.status = filter.status;
+    if (filter.fromDate || filter.toDate) {
+      where.createdAt = {};
+      if (filter.fromDate) where.createdAt.gte = new Date(filter.fromDate);
+      if (filter.toDate) where.createdAt.lte = new Date(filter.toDate);
+    }
+    if (filter.search) {
+      const q = filter.search.trim();
+      where.OR = [
+        { orderNumber: { contains: q, mode: 'insensitive' } },
+        { customer: { name: { contains: q, mode: 'insensitive' } } },
+        { customer: { email: { contains: q, mode: 'insensitive' } } },
+        {
+          shippingAddress: {
+            path: ['phone'],
+            string_contains: q,
+          } as any,
+        },
+      ];
+    }
+
+    const [items, total] = await Promise.all([
+      this.prisma.order.findMany({
+        where,
+        skip,
+        take: pageSize,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          items: { select: { id: true } },
+          customer: { select: { id: true, name: true, email: true } },
+        },
+      }),
+      this.prisma.order.count({ where }),
+    ]);
+
+    // Lấy shipment cho từng order (1-1 theo orderId)
+    const orderIds = items.map((o) => o.id);
+    const shipments = await this.prisma.outboundShipment.findMany({
+      where: { orderId: { in: orderIds } },
+      select: { id: true, orderId: true, status: true, shipmentNumber: true },
+    });
+    const shipmentByOrderId = new Map(shipments.map((s) => [s.orderId, s]));
+
+    return {
+      items: items.map((o) =>
+        this.serializeOrder({ ...o, shipment: shipmentByOrderId.get(o.id) ?? null }),
+      ),
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize),
+    };
+  }
+
+  /**
+   * Update order status (cho admin).
+   */
+  async updateOrderStatus(
+    orderId: string,
+    newStatus: OrderStatus,
+    userId: string,
+    note?: string,
+  ) {
+    const order = await this.prisma.order.findUnique({ where: { id: orderId } });
+    if (!order) throw new NotFoundException('Không tìm thấy đơn hàng');
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const o = await tx.order.update({
+        where: { id: orderId },
+        data: { status: newStatus },
+      });
+      await tx.orderStatusHistory.create({
+        data: {
+          orderId,
+          status: newStatus,
+          note: note || `Status changed to ${newStatus}`,
+          changedBy: userId,
+        },
+      });
+      return o;
+    });
+
+    // Publish event
+    setImmediate(() => {
+      this.eventBus.publish('order.status_changed' as any, {
+        orderId,
+        orderNumber: order.orderNumber,
+        oldStatus: order.status,
+        newStatus,
+      });
+    });
+
+    return this.serializeOrder(updated);
+  }
+
+  private serializeOrder<T extends { total?: any; subtotal?: any; shippingCost?: any; taxAmount?: any; discountAmount?: any; ctvCommissionAmount?: any }>(order: T): T {
+    const num = (v: any) => (v && typeof v === 'object' && 'toNumber' in v ? v.toNumber() : Number(v));
+    return {
+      ...order,
+      total: order.total !== undefined ? num(order.total) : undefined,
+      subtotal: order.subtotal !== undefined ? num(order.subtotal) : undefined,
+      shippingCost: order.shippingCost !== undefined ? num(order.shippingCost) : undefined,
+      taxAmount: order.taxAmount !== undefined ? num(order.taxAmount) : undefined,
+      discountAmount: order.discountAmount !== undefined ? num(order.discountAmount) : undefined,
+      ctvCommissionAmount: order.ctvCommissionAmount !== undefined ? num(order.ctvCommissionAmount) : undefined,
+    } as T;
   }
 
   /**
