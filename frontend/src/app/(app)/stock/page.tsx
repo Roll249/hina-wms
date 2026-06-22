@@ -2,11 +2,24 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Search, AlertTriangle, Edit3, FolderTree, Plus, Settings2, Globe } from "lucide-react";
+import {
+  Search,
+  AlertTriangle,
+  Edit3,
+  FolderTree,
+  Plus,
+  Settings2,
+  Globe,
+  Download,
+  CheckSquare,
+  Square,
+  X,
+} from "lucide-react";
 import {
   useStock,
   useClassificationCounts,
   useCategories,
+  exportStockCsv,
 } from "@/hooks/use-stock";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -16,6 +29,8 @@ import { useSse } from "@/hooks/use-sse";
 import { useQueryClient } from "@tanstack/react-query";
 import { EditProductDrawer } from "@/components/stock/edit-product-drawer";
 import { WebStockModal } from "@/components/stock/web-stock-modal";
+import { BulkEditDrawer } from "@/components/stock/bulk-edit-drawer";
+import { toast } from "sonner";
 
 type Tab = "unclassified" | "classified";
 
@@ -26,9 +41,11 @@ export default function StockPage() {
   const [categoryFilter, setCategoryFilter] = useState<string>("");
   const [editProductId, setEditProductId] = useState<string | null>(null);
   const [webStockProductId, setWebStockProductId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showBulkEdit, setShowBulkEdit] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const qc = useQueryClient();
 
-  // Auto-refetch khi có stock event
   useSse("/sse/stream", (msg) => {
     if (msg.type === "stock.changed" || msg.type === "web_stock.changed") {
       qc.invalidateQueries({ queryKey: ["stock"] });
@@ -48,15 +65,79 @@ export default function StockPage() {
     pageSize: 100,
   });
 
-  // Hiển thị lỗi rõ ràng nếu API bị 403
   const anyError = countsError || categoriesError || stockError;
   const is403 = (anyError as any)?.response?.status === 403 || (anyError as any)?.status === 403;
+
+  // Select logic
+  const visibleIds = (data?.items ?? [])
+    .map((it) => it.productId)
+    .filter((id): id is string => !!id);
+  const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
+  const someSelected = visibleIds.some((id) => selectedIds.has(id));
+
+  const toggleAll = () => {
+    if (allSelected) {
+      // Bỏ chọn chỉ những cái visible
+      const next = new Set(selectedIds);
+      visibleIds.forEach((id) => next.delete(id));
+      setSelectedIds(next);
+    } else {
+      const next = new Set(selectedIds);
+      visibleIds.forEach((id) => next.add(id));
+      setSelectedIds(next);
+    }
+  };
+
+  const toggleOne = (id: string) => {
+    const next = new Set(selectedIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedIds(next);
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const blob = await exportStockCsv({
+        search: search || undefined,
+        isClassified,
+        categoryId: categoryFilter || undefined,
+        lowStockOnly: lowOnly,
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `ton-kho-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success("Đã xuất file CSV");
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || "Lỗi xuất CSV");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   return (
     <div className="space-y-3 pb-24">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Tồn kho</h1>
         <div className="flex items-center gap-2">
+          <button
+            onClick={handleExport}
+            disabled={exporting}
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-gray-300 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            title="Xuất danh sách tồn kho ra CSV"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">
+              {exporting ? "Đang xuất..." : "Xuất CSV"}
+            </span>
+          </button>
           <Link
             href="/categories"
             className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-gray-300 text-xs font-medium text-gray-700 hover:bg-gray-50"
@@ -73,7 +154,40 @@ export default function StockPage() {
         </div>
       </div>
 
-      {/* Tabs phân loại */}
+      {/* Bulk action bar */}
+      {selectedIds.size > 0 && (
+        <div className="sticky top-0 z-20 bg-blue-600 text-white rounded-lg shadow-lg p-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-semibold">
+              Đã chọn {selectedIds.size} SP
+            </span>
+            <button
+              onClick={clearSelection}
+              className="text-xs text-blue-100 hover:text-white underline"
+            >
+              Bỏ chọn
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowBulkEdit(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-white text-blue-700 text-xs font-medium hover:bg-blue-50"
+            >
+              <Edit3 className="h-3.5 w-3.5" />
+              Sửa hàng loạt
+            </button>
+            <button
+              onClick={clearSelection}
+              className="p-1.5 rounded hover:bg-blue-700"
+              title="Đóng"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Tabs */}
       <div className="flex border-b bg-white rounded-t-lg overflow-hidden">
         <button
           onClick={() => {
@@ -151,7 +265,6 @@ export default function StockPage() {
           </button>
         </div>
 
-        {/* Category filter - chỉ hiện khi tab "Đã phân loại" */}
         {tab === "classified" && categories.length > 0 && (
           <div className="flex items-center gap-2 overflow-x-auto pb-1">
             <FolderTree className="h-4 w-4 text-gray-400 flex-shrink-0" />
@@ -192,6 +305,30 @@ export default function StockPage() {
         )}
       </div>
 
+      {/* Select all row */}
+      {data && data.items.length > 0 && (
+        <div className="flex items-center gap-2 px-1">
+          <button
+            onClick={toggleAll}
+            className="flex items-center gap-1.5 text-xs font-medium text-gray-700 hover:text-primary-600"
+          >
+            {allSelected ? (
+              <CheckSquare className="h-4 w-4 text-primary-600" />
+            ) : someSelected ? (
+              <CheckSquare className="h-4 w-4 text-primary-400 opacity-50" />
+            ) : (
+              <Square className="h-4 w-4" />
+            )}
+            {allSelected ? "Bỏ chọn tất cả" : "Chọn tất cả (trang này)"}
+          </button>
+          {selectedIds.size > 0 && (
+            <span className="text-xs text-blue-600 font-medium">
+              · {selectedIds.size} đã chọn
+            </span>
+          )}
+        </div>
+      )}
+
       {/* List */}
       {is403 ? (
         <Card padding="lg" className="text-center">
@@ -222,79 +359,98 @@ export default function StockPage() {
         </Card>
       ) : (
         <div className="space-y-2">
-          {data?.items.map((item) => (
-            <Card
-              key={item.inventoryId}
-              padding="sm"
-              className="hover:shadow-md transition-shadow"
-            >
-              <div className="flex items-center gap-3">
-                {item.imageUrl && (
-                  <img
-                    src={item.imageUrl}
-                    alt=""
-                    className="w-12 h-12 object-cover rounded flex-shrink-0"
-                  />
+          {data?.items.map((item) => {
+            const checked = item.productId ? selectedIds.has(item.productId) : false;
+            return (
+              <Card
+                key={item.inventoryId}
+                padding="sm"
+                className={cn(
+                  "hover:shadow-md transition-shadow",
+                  checked && "ring-2 ring-primary-500 bg-blue-50/30",
                 )}
-                <div className="flex-1 min-w-0">
-                  <p className="font-mono text-xs text-gray-500">
-                    {item.productCode}
-                    {item.categoryName && (
-                      <span className="ml-2 px-1.5 py-0.5 bg-gray-100 rounded text-[10px]">
-                        {item.categoryName}
-                      </span>
-                    )}
-                  </p>
-                  <p className="text-sm font-medium text-gray-900 line-clamp-2">
-                    {item.name}
-                  </p>
-                  {item.variantName && item.variantName !== item.name && (
-                    <p className="text-xs text-gray-500">{item.variantName}</p>
-                  )}
-                  <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
-                    <span>Đặt: {item.reservedQty}</span>
-                    {item.isLowStock && (
-                      <Badge variant="warning" className="text-[10px]">
-                        Tồn thấp
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-                <div className="text-right flex flex-col items-end gap-1">
-                  <p
-                    className={cn(
-                      "text-lg font-bold",
-                      item.available <= 0
-                        ? "text-red-600"
-                        : item.available <= item.lowStockThreshold
-                          ? "text-yellow-600"
-                          : "text-green-600",
-                    )}
+              >
+                <div className="flex items-center gap-3">
+                  {/* Checkbox */}
+                  <button
+                    onClick={() => item.productId && toggleOne(item.productId)}
+                    className="flex-shrink-0 p-0.5"
+                    disabled={!item.productId}
                   >
-                    {formatNumber(item.available)}
-                  </p>
-                  <p className="text-[10px] text-gray-400">có thể bán</p>
-                  <div className="flex flex-col gap-1 mt-1">
-                    <button
-                      onClick={() => item.productId && setWebStockProductId(item.productId)}
-                      className="px-2 py-1 rounded text-[10px] font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 flex items-center gap-1"
-                      title="Set số lượng đẩy lên web"
+                    {checked ? (
+                      <CheckSquare className="h-5 w-5 text-primary-600" />
+                    ) : (
+                      <Square className="h-5 w-5 text-gray-400" />
+                    )}
+                  </button>
+
+                  {item.imageUrl && (
+                    <img
+                      src={item.imageUrl}
+                      alt=""
+                      className="w-12 h-12 object-cover rounded flex-shrink-0"
+                    />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-mono text-xs text-gray-500">
+                      {item.productCode}
+                      {item.categoryName && (
+                        <span className="ml-2 px-1.5 py-0.5 bg-gray-100 rounded text-[10px]">
+                          {item.categoryName}
+                        </span>
+                      )}
+                    </p>
+                    <p className="text-sm font-medium text-gray-900 line-clamp-2">
+                      {item.name}
+                    </p>
+                    {item.variantName && item.variantName !== item.name && (
+                      <p className="text-xs text-gray-500">{item.variantName}</p>
+                    )}
+                    <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
+                      <span>Đặt: {item.reservedQty}</span>
+                      {item.isLowStock && (
+                        <Badge variant="warning" className="text-[10px]">
+                          Tồn thấp
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-right flex flex-col items-end gap-1">
+                    <p
+                      className={cn(
+                        "text-lg font-bold",
+                        item.available <= 0
+                          ? "text-red-600"
+                          : item.available <= item.lowStockThreshold
+                            ? "text-yellow-600"
+                            : "text-green-600",
+                      )}
                     >
-                      <Globe className="h-3 w-3" />
-                      Web
-                    </button>
-                    <button
-                      onClick={() => item.productId && setEditProductId(item.productId)}
-                      className="px-2 py-1 rounded text-[10px] font-medium bg-primary-50 text-primary-500 hover:bg-primary-100 flex items-center gap-1"
-                    >
-                      <Edit3 className="h-3 w-3" />
-                      Sửa
-                    </button>
+                      {formatNumber(item.available)}
+                    </p>
+                    <p className="text-[10px] text-gray-400">có thể bán</p>
+                    <div className="flex flex-col gap-1 mt-1">
+                      <button
+                        onClick={() => item.productId && setWebStockProductId(item.productId)}
+                        className="px-2 py-1 rounded text-[10px] font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 flex items-center gap-1"
+                        title="Set số lượng đẩy lên web"
+                      >
+                        <Globe className="h-3 w-3" />
+                        Web
+                      </button>
+                      <button
+                        onClick={() => item.productId && setEditProductId(item.productId)}
+                        className="px-2 py-1 rounded text-[10px] font-medium bg-primary-50 text-primary-500 hover:bg-primary-100 flex items-center gap-1"
+                      >
+                        <Edit3 className="h-3 w-3" />
+                        Sửa
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </Card>
-          ))}
+              </Card>
+            );
+          })}
         </div>
       )}
 
@@ -314,6 +470,16 @@ export default function StockPage() {
         productId={webStockProductId}
         open={!!webStockProductId}
         onClose={() => setWebStockProductId(null)}
+      />
+
+      <BulkEditDrawer
+        productIds={Array.from(selectedIds)}
+        open={showBulkEdit}
+        onClose={() => setShowBulkEdit(false)}
+        onSuccess={() => {
+          clearSelection();
+          qc.invalidateQueries({ queryKey: ["stock"] });
+        }}
       />
     </div>
   );

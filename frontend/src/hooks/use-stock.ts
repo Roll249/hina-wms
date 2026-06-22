@@ -113,7 +113,7 @@ export interface ProductDetail {
   sku: string;
   description: string | null;
   shortDesc: string | null;
-  basePrice: string;       // Decimal serialized
+  basePrice: string;
   weight: string | null;
   dimensions: Record<string, number> | null;
   attributes: Record<string, any> | null;
@@ -178,4 +178,63 @@ export function useProductHistory(productId: string | null) {
     },
     enabled: !!productId,
   });
+}
+
+export type BulkEditField =
+  | "categoryId"
+  | "isClassified"
+  | "basePrice"
+  | "taxRate"
+  | "visibility"
+  | "showPriceToGuest"
+  | "showPriceToRetail"
+  | "showPriceToWholesale";
+
+export interface BulkEditOp {
+  field: BulkEditField;
+  mode: "set" | "increase" | "decrease";
+  value: number | string | boolean;
+}
+
+export function useBulkEditProducts() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: {
+      productIds: string[];
+      operations: BulkEditOp[];
+    }) => {
+      const { data } = await api.post("/stock-bulk/edit", body);
+      return data as {
+        total: number;
+        changed: number;
+        records: Array<{
+          productId: string;
+          productCode: string;
+          productName: string;
+          changes: Record<string, [any, any]>;
+        }>;
+      };
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["stock"] });
+      qc.invalidateQueries({ queryKey: ["classification-counts"] });
+      qc.invalidateQueries({ queryKey: ["categories"] });
+    },
+  });
+}
+
+/**
+ * Export CSV từ server. Trả về Blob để FE tự download.
+ */
+export async function exportStockCsv(filters: {
+  search?: string;
+  isClassified?: boolean;
+  categoryId?: string;
+  lowStockOnly?: boolean;
+}): Promise<Blob> {
+  const res = await api.get("/stock-bulk/export-csv", {
+    params: filters,
+    responseType: "blob",
+  });
+  return res.data as Blob;
 }
