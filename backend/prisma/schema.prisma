@@ -189,6 +189,12 @@ model User {
   createdPermissionPresets PermissionPreset[] @relation("PermissionPresetCreatedBy")
   updatedPermissionPresets PermissionPreset[] @relation("PermissionPresetUpdatedBy")
 
+  // Stocktake relations
+  stocktakesCreated  Stocktake[] @relation("StocktakeCreatedBy")
+  stocktakesStarted Stocktake[] @relation("StocktakeStartedBy")
+  stocktakesCompleted Stocktake[] @relation("StocktakeCompletedBy")
+  stocktakesCancelled Stocktake[] @relation("StocktakeCancelledBy")
+
   @@index([email])
   @@index([role])
   @@index([permissionMask])
@@ -1117,6 +1123,89 @@ model OutboundShipmentItem {
   packedQuantity Int     @default(0)
 
   @@index([shipmentId])
+  @@index([productId])
+  @@index([variantId])
+}
+
+// ============================================================
+// STOCKTAKE MODELS - Kiểm kê kho
+// ============================================================
+
+enum StocktakeStatus {
+  DRAFT
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum AdjustmentType {
+  RECOUNT
+  DAMAGED
+  EXPIRED
+  LOST
+  FOUND
+  RETURN
+}
+
+model Stocktake {
+  id               String          @id @default(uuid())
+  stocktakeNumber  String          @unique
+  name             String
+  note             String?
+  scheduledDate    DateTime?
+
+  status           StocktakeStatus @default(DRAFT)
+
+  createdById      String
+  startedAt        DateTime?
+  startedById      String?
+  completedAt      DateTime?
+  completedById    String?
+  cancelledAt      DateTime?
+  cancelledById    String?
+
+  adjustmentCount  Int             @default(0)
+  totalDifference  Int             @default(0)
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  items           StocktakeItem[]
+
+  createdBy       User            @relation("StocktakeCreatedBy", fields: [createdById], references: [id])
+  startedBy       User?           @relation("StocktakeStartedBy", fields: [startedById], references: [id])
+  completedBy     User?           @relation("StocktakeCompletedBy", fields: [completedById], references: [id])
+  cancelledBy     User?           @relation("StocktakeCancelledBy", fields: [cancelledById], references: [id])
+
+  @@index([status])
+  @@index([createdById])
+  @@index([createdAt])
+}
+
+model StocktakeItem {
+  id               String        @id @default(uuid())
+  stocktakeId     String
+  stocktake       Stocktake     @relation(fields: [stocktakeId], references: [id], onDelete: Cascade)
+
+  productId       String?
+  variantId        String?
+
+  // Note: không dùng @relation với Product/ProductVariant vì có nhiều StocktakeItem cùng 1 product
+
+  expectedQty     Int           @default(0)
+  countedQty      Int           @default(0)
+
+  note            String?
+  adjustmentType  AdjustmentType?
+
+  countedAt       DateTime?
+  countedById     String?
+
+  // Note: countedById để reference user nhưng không dùng @relation
+
+  createdAt       DateTime      @default(now())
+
+  @@index([stocktakeId])
   @@index([productId])
   @@index([variantId])
 }

@@ -47,6 +47,12 @@ export class WebhookController implements OnModuleInit {
         await this.handleOrderCancelled(event.data);
       } else if (event.type === 'order.item_sold') {
         await this.handleOrderItemSold(event.data);
+      } else if (event.type === 'stock.changed') {
+        // Forward stock changes để SSE clients nhận notification
+        await this.handleStockChanged(event.data);
+      } else if (event.type === 'web_stock.changed') {
+        // Forward web stock changes để SSE clients nhận notification
+        await this.eventBus.publish('web_stock.changed' as any, event.data);
       }
     });
   }
@@ -78,7 +84,9 @@ export class WebhookController implements OnModuleInit {
       case 'product.changed':
       case 'category.changed':
       case 'price.changed':
-        // Forward cho EventBus để clients SSE nhận
+      case 'stock.changed':
+      case 'web_stock.changed':
+        // Forward cho EventBus để clients SSE nhận notification realtime
         await this.eventBus.publish(
           payload.type as any,
           payload.data,
@@ -150,6 +158,27 @@ export class WebhookController implements OnModuleInit {
     } catch (err) {
       this.logger.error(
         `Failed to sync sold: ${(err as Error).message}`,
+      );
+    }
+  }
+
+  /**
+   * Stock changed: forward để SSE clients nhận notification
+   * data: { inventoryId, productId, variantId, quantity, delta, reference }
+   */
+  private async handleStockChanged(data: any) {
+    try {
+      await this.eventBus.publish('stock.changed' as any, {
+        inventoryId: data.inventoryId,
+        productId: data.productId,
+        variantId: data.variantId,
+        quantity: data.quantity,
+        delta: data.delta,
+        reference: data.reference,
+      });
+    } catch (err) {
+      this.logger.error(
+        `Failed to broadcast stock.changed: ${(err as Error).message}`,
       );
     }
   }

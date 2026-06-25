@@ -16,6 +16,10 @@ import { WebStockModule } from './modules/web-stock/web-stock.module';
 import { WebhookModule } from './modules/webhook/webhook.module';
 import { SseModule } from './modules/sse/sse.module';
 import { HealthModule } from './modules/health/health.module';
+import { StocktakeModule } from './modules/stocktake/stocktake.module';
+import { ReportsModule } from './modules/reports/reports.module';
+import { ImportExportModule } from './modules/import-export/import-export.module';
+import { BarcodeModule } from './modules/barcode/barcode.module';
 
 @Module({
   imports: [
@@ -36,6 +40,10 @@ import { HealthModule } from './modules/health/health.module';
     WebhookModule,
     SseModule,
     HealthModule,
+    StocktakeModule,
+    ReportsModule,
+    ImportExportModule,
+    BarcodeModule,
   ],
 })
 export class AppModule {}
