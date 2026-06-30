@@ -226,7 +226,7 @@ export default function BarcodePage() {
                     )}
                   </div>
                   <div className="text-right">
-                    <Badge variant={result.quantity > 0 ? "success" : "destructive"}>
+                    <Badge variant={result.quantity > 0 ? "success" : "danger"}>
                       {formatNumber(result.quantity)}
                     </Badge>
                   </div>
