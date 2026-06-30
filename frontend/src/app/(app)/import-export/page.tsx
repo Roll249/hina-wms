@@ -251,7 +251,7 @@ export default function ImportExportPage() {
                 <p className="text-sm text-gray-500">Tải về danh sách tồn kho (CSV)</p>
               </div>
               <Button
-                variant="outline"
+                variant="ghost"
                 onClick={() => exportInventory.mutate()}
                 disabled={exportInventory.isPending}
               >
@@ -275,7 +275,7 @@ export default function ImportExportPage() {
                 <p className="text-sm text-gray-500">Tải về danh sách sản phẩm (CSV)</p>
               </div>
               <Button
-                variant="outline"
+                variant="ghost"
                 onClick={() => exportProducts.mutate()}
                 disabled={exportProducts.isPending}
               >
@@ -307,7 +307,7 @@ export default function ImportExportPage() {
               onChange={(e) => handleFileUpload(e, "products")}
             />
             <Button
-              variant="outline"
+              variant="ghost"
               onClick={() => fileInputRef.current?.click()}
               disabled={importProducts.isPending}
             >
@@ -329,7 +329,7 @@ export default function ImportExportPage() {
               onChange={(e) => handleFileUpload(e, "receipt")}
             />
             <Button
-              variant="outline"
+              variant="ghost"
               onClick={() => document.getElementById("receipt-upload")?.click()}
               disabled={importReceipt.isPending}
             >
@@ -356,7 +356,7 @@ export default function ImportExportPage() {
               onChange={(e) => handleFileUpload(e, "adjust")}
             />
             <Button
-              variant="outline"
+              variant="ghost"
               onClick={() => document.getElementById("adjust-upload")?.click()}
               disabled={bulkAdjust.isPending}
             >
@@ -370,7 +370,7 @@ export default function ImportExportPage() {
             <p className="text-sm text-gray-500 mb-3">Tải template để import đúng format</p>
             <div className="flex gap-2">
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
                 onClick={async () => {
                   const { data } = await api.get("/import-export/template/stock");
@@ -386,7 +386,7 @@ export default function ImportExportPage() {
                 Template điều chỉnh
               </Button>
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
                 onClick={async () => {
                   const { data } = await api.get("/import-export/template/products");

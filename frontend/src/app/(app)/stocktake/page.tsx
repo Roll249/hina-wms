@@ -194,7 +194,7 @@ export default function StocktakePage() {
               </div>
               <div className="flex gap-2 pt-2">
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   onClick={() => setShowCreate(false)}
                   className="flex-1"
                 >
@@ -294,7 +294,7 @@ export default function StocktakePage() {
                       </Button>
                     )}
                     {st.status === "COMPLETED" && st.totalDifference !== 0 && (
-                      <Badge variant={st.totalDifference > 0 ? "success" : "destructive"}>
+                      <Badge variant={st.totalDifference > 0 ? "success" : "danger"}>
                         {st.totalDifference > 0 ? "+" : ""}{formatNumber(st.totalDifference)}
                       </Badge>
                     )}

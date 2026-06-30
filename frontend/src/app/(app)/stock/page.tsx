@@ -147,7 +147,7 @@ export default function StockPage() {
             <span className="hidden sm:inline">Quản lý DM</span>
           </Link>
           {data && (
-            <Badge variant="default">
+            <Badge variant="gray">
               {data.items.length} / {data.total}
             </Badge>
           )}

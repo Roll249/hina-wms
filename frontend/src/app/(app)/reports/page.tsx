@@ -82,7 +82,7 @@ export default function ReportsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Báo cáo kho</h1>
-        <Button variant="outline" size="sm">
+        <Button variant="ghost" size="sm">
           <Download className="h-4 w-4 mr-1" />
           Export
         </Button>

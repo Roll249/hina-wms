@@ -186,7 +186,7 @@ export default function StocktakeDetailPage() {
           <h1 className="text-xl font-bold">{stocktake.stocktakeNumber}</h1>
           <p className="text-sm text-gray-500">{stocktake.name}</p>
         </div>
-        <Badge variant={stocktake.status === "COMPLETED" ? "success" : stocktake.status === "CANCELLED" ? "destructive" : "default"}>
+        <Badge variant={stocktake.status === "COMPLETED" ? "success" : stocktake.status === "CANCELLED" ? "danger" : "default"}>
           {stocktake.status}
         </Badge>
       </div>
@@ -216,7 +216,7 @@ export default function StocktakeDetailPage() {
       {/* Actions */}
       {canEdit && (
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setShowAddProduct(true)} className="flex-1">
+          <Button variant="ghost" onClick={() => setShowAddProduct(true)} className="flex-1">
             <Plus className="h-4 w-4 mr-1" />
             Thêm sản phẩm
           </Button>
