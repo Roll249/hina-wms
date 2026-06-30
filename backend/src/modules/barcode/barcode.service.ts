@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 
-interface BarcodeResult {
+export interface BarcodeResult {
   productId?: string;
   variantId?: string;
   productCode: string;
@@ -48,7 +48,7 @@ export class BarcodeService {
       return {
         variantId: variant.id,
         productId: variant.productId,
-        productCode: variant.productCode,
+        productCode: variant.productCode ?? '',
         sku: variant.sku,
         name: `${variant.product.name} - ${variant.name}`,
         type: 'variant',

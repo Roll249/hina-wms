@@ -50,9 +50,9 @@ export class WebhookController implements OnModuleInit {
       } else if (event.type === 'stock.changed') {
         // Forward stock changes để SSE clients nhận notification
         await this.handleStockChanged(event.data);
-      } else if (event.type === 'web_stock.changed') {
+      } else if ((event.type as string) === 'web_stock.changed') {
         // Forward web stock changes để SSE clients nhận notification
-        await this.eventBus.publish('web_stock.changed' as any, event.data);
+        await this.eventBus.publish('web_stock.changed' as any, event.data as any);
       }
     });
   }

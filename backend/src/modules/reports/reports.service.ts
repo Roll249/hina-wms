@@ -139,7 +139,7 @@ export class ReportsService {
       if (m.quantity > 0) {
         if (m.type === 'GOODS_RECEIPT' || m.type === 'STOCK_INITIALIZED' || m.type === 'RETURN') {
           existing.received += m.quantity;
-        } else if (m.type === 'STOCK_ADJUSTED_MANUAL' || m.type === 'STOCKTAKE_ADJUST' || m.type === 'FOUND') {
+        } else if (m.type === 'STOCK_ADJUSTED_MANUAL' || m.type === 'STOCKTAKE_ADJUST') {
           existing.adjusted += m.quantity;
         }
       } else {
@@ -213,16 +213,13 @@ export class ReportsService {
     const start = new Date(fromDate);
     const end = new Date(toDate);
 
-    // Get order items in date range
+    // Get order items in date range (use snapshot fields - no direct product relation)
     const orderItems = await this.prisma.orderItem.findMany({
       where: {
         order: {
           createdAt: { gte: start, lte: end },
           status: { in: ['COMPLETED', 'DELIVERED'] },
         },
-      },
-      include: {
-        product: { select: { name: true, productCode: true } },
       },
     });
 
@@ -232,7 +229,7 @@ export class ReportsService {
     for (const item of orderItems) {
       const existing = productStats.get(item.productId) ?? {
         productId: item.productId,
-        name: item.product?.name ?? '',
+        name: item.productName,
         productCode: item.productCode,
         quantity: 0,
         revenue: 0,
@@ -304,7 +301,7 @@ export class ReportsService {
       let cmp = 0;
       if (sortBy === 'quantity') cmp = a.quantity - b.quantity;
       else if (sortBy === 'value') cmp = a.value - b.value;
-      else if (sortBy === 'name') cmp = a.name.localeCompare(b.name);
+      else if (sortBy === 'name') cmp = (a.name ?? '').localeCompare(b.name ?? '');
       return sortDir === 'desc' ? -cmp : cmp;
     });
 

@@ -145,7 +145,7 @@ export class ImportExportService {
         let category = null;
         if (row.categoryName) {
           category = await this.prisma.category.findFirst({
-            where: { name: { equals: row.categoryName, mode: 'insensitive' } } as any },
+            where: { name: { equals: row.categoryName, mode: 'insensitive' } as any },
           });
         }
 
@@ -175,14 +175,21 @@ export class ImportExportService {
           });
           results.updated++;
         } else {
-          await this.prisma.product.create({
-            data: {
-              ...data,
-              sku: row.sku ?? `SKU-${Date.now()}`,
-              productCode: row.productCode ?? `PC-${Date.now()}`,
-              slug: row.name.toLowerCase().replace(/\s+/g, '-'),
-            },
-          });
+          const createData: any = {
+            name: row.name,
+            slug: row.name.toLowerCase().replace(/\s+/g, '-'),
+            sku: row.sku ?? `SKU-${Date.now()}`,
+            productCode: row.productCode ?? `PC-${Date.now()}`,
+            basePrice: row.basePrice ?? 0,
+          };
+          if (category?.id) {
+            createData.categoryId = category.id;
+          }
+          if (row.description) createData.description = row.description;
+          if (row.weight) createData.weight = row.weight;
+          if (row.supplierCode) createData.supplierCode = row.supplierCode;
+          
+          await this.prisma.product.create({ data: createData });
           results.created++;
         }
       } catch (err) {
@@ -254,17 +261,24 @@ export class ImportExportService {
           },
         });
 
-        // Update inventory
-        await tx.inventory.upsert({
-          where: { productId_variantId: { productId: product.id, variantId: null } },
-          create: {
-            productId: product.id,
-            quantity: row.quantity,
-          },
-          update: {
-            quantity: { increment: row.quantity },
-          },
+        // Update inventory - use first() to find existing or create new
+        const existingInventory = await tx.inventory.findFirst({
+          where: { productId: product.id },
         });
+        
+        if (existingInventory) {
+          await tx.inventory.update({
+            where: { id: existingInventory.id },
+            data: { quantity: { increment: row.quantity } },
+          });
+        } else {
+          await tx.inventory.create({
+            data: {
+              productId: product.id,
+              quantity: row.quantity,
+            },
+          });
+        }
 
         // Create movement
         await tx.inventoryMovement.create({

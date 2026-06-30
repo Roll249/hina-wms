@@ -1,7 +1,7 @@
 'use client';
 
-import { OrderListPage } from '@/components/admin-orders/OrderListPage';
+import { OrderManagementPage } from '@/components/admin-orders/OrderManagementPage';
 
 export default function AdminOrdersPage() {
-  return <OrderListPage />;
+  return <OrderManagementPage />;
 }

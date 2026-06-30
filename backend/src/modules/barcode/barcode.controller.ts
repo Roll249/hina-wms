@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Body, Param, Query } from '@nestjs/common';
-import { BarcodeService } from './barcode.service';
+import { BarcodeService, BarcodeResult } from './barcode.service';
 import { Roles } from '../../common/decorators/auth.decorators';
 
 @Controller('barcode')
@@ -10,7 +10,7 @@ export class BarcodeController {
    * Tra cứu barcode đơn lẻ
    */
   @Get('lookup/:code')
-  lookup(@Param('code') code: string) {
+  lookup(@Param('code') code: string): Promise<BarcodeResult> {
     return this.barcode.lookup(code);
   }
 
@@ -18,7 +18,7 @@ export class BarcodeController {
    * Batch lookup - tra cứu nhiều barcodes
    */
   @Post('batch-lookup')
-  batchLookup(@Body() body: { barcodes: string[] }) {
+  batchLookup(@Body() body: { barcodes: string[] }): Promise<BarcodeResult[]> {
     return this.barcode.batchLookup(body.barcodes);
   }
 

@@ -55,6 +55,7 @@ enum OrderSource {
 
 enum PaymentMethod {
   COD
+  CASH
   BANK_TRANSFER
 }
 
@@ -308,6 +309,9 @@ model CtvCustomer {
   // CTVs are assigned to specific wholesale customers
   assignedCustomers CtvAssignment[]
 
+  // E-Comm sync: category commissions
+  categoryCommissions CtvCategoryCommission[]
+
   // Orders created by this CTV
   orders           Order[]
 
@@ -325,6 +329,22 @@ model CtvCustomer {
 
   @@index([userId])
   @@index([employeeCode])
+}
+
+model CtvCategoryCommission {
+  id            String      @id @default(uuid())
+  ctvId         String
+  categoryId    String
+  commissionPct Decimal     @default(0) @db.Decimal(5, 2)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  ctv           CtvCustomer @relation(fields: [ctvId], references: [id], onDelete: Cascade)
+  category      Category    @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([ctvId, categoryId])
+  @@index([ctvId])
+  @@index([categoryId])
 }
 
 // Links CTV to specific wholesale customers they can create orders for
@@ -373,12 +393,16 @@ model Category {
   taxRate     Decimal?   @db.Decimal(5, 4)
   sortOrder   Int        @default(0)
   isActive    Boolean    @default(true)
+  defaultCtvCommissionPct Decimal @default(0) @db.Decimal(5, 2)
 
   // Storefront placement flags
   showOnMegaMenu Boolean @default(false)
   showOnHomepageCard Boolean @default(false)
   megaMenuSortOrder Int?
   homepageCardSortOrder Int?
+
+  // E-Comm sync: CTV category commissions
+  ctvCategoryCommissions CtvCategoryCommission[]
 
   products    Product[]
   parent      Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
@@ -524,6 +548,7 @@ model Order {
   cancelledAt     DateTime?
   cancelledBy     String?
   cancellationReason String?
+  createdBy       String?
 
   @@index([customerId])
   @@index([customerId, createdAt])
@@ -570,6 +595,7 @@ model OrderItem {
   orderId         String
   productId       String
   variantId       String?
+  categoryId      String?
 
   // SNAPSHOT fields - stored at order creation time (per D-03)
   productName     String   // Snapshot of product name

@@ -184,17 +184,15 @@ export class StocktakeService {
         totalDifference += diff;
 
         // Update inventory
-        await tx.inventory.update({
-          where: {
-            productId_variantId: {
-              productId: item.productId,
-              variantId: item.variantId,
-            },
-          },
-          data: {
-            quantity: { increment: diff },
-          },
+        const inv = await tx.inventory.findFirst({
+          where: { productId: item.productId },
         });
+        if (inv) {
+          await tx.inventory.update({
+            where: { id: inv.id },
+            data: { quantity: { increment: diff } },
+          });
+        }
 
         // Create inventory movement
         await tx.inventoryMovement.create({
@@ -284,13 +282,7 @@ export class StocktakeService {
     const stocktake = await this.prisma.stocktake.findUnique({
       where: { id: stocktakeId },
       include: {
-        items: {
-          include: {
-            product: { select: { name: true, productCode: true, sku: true, images: { take: 1 } } },
-            variant: { select: { name: true, productCode: true, sku: true } },
-            countedBy: { select: { name: true, email: true } },
-          },
-        },
+        items: true,
         createdBy: { select: { name: true, email: true } },
         startedBy: { select: { name: true, email: true } },
         completedBy: { select: { name: true, email: true } },
@@ -300,7 +292,38 @@ export class StocktakeService {
     if (!stocktake) {
       throw new NotFoundException('Phiếu kiểm kê không tồn tại');
     }
-    return stocktake;
+
+    // Enrich items with product/variant info from separate queries
+    const itemsWithDetails = await Promise.all(
+      stocktake.items.map(async (item) => {
+        let product: { name: string; productCode: string; sku: string; images: { url: string }[] } | null = null;
+        let variant: { name: string; productCode: string; sku: string } | null = null;
+
+        if (item.productId) {
+          const p = await this.prisma.product.findUnique({
+            where: { id: item.productId },
+            select: { name: true, productCode: true, sku: true, images: { take: 1, select: { url: true } } },
+          });
+          if (p) {
+            product = { name: p.name, productCode: p.productCode ?? '', sku: p.sku, images: p.images };
+          }
+        }
+
+        if (item.variantId) {
+          const v = await this.prisma.productVariant.findUnique({
+            where: { id: item.variantId },
+            select: { name: true, productCode: true, sku: true },
+          });
+          if (v) {
+            variant = { name: v.name, productCode: v.productCode ?? '', sku: v.sku };
+          }
+        }
+
+        return { ...item, product, variant };
+      })
+    );
+
+    return { ...stocktake, items: itemsWithDetails };
   }
 
   /**
