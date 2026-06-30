@@ -118,7 +118,7 @@ export default function BarcodePage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Quét mã vạch</h1>
         <Button
-          variant={scanMode ? "default" : "outline"}
+          variant={scanMode ? "primary" : "ghost"}
           onClick={() => setScanMode(!scanMode)}
         >
           <Scan className="h-4 w-4 mr-1" />
