@@ -306,7 +306,7 @@ export default function BarcodePage() {
                     <p className="font-medium text-sm truncate">{scan.name}</p>
                     <p className="text-xs text-gray-500">{scan.productCode}</p>
                   </div>
-                  <Badge variant={scan.quantity === 0 ? "destructive" : "default"}>
+                  <Badge variant={scan.quantity === 0 ? "danger" : "gray"}>
                     {formatNumber(scan.quantity ?? 0)}
                   </Badge>
                 </div>
